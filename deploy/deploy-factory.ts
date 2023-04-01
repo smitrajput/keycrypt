@@ -36,6 +36,7 @@ export default async function (hre: HardhatRuntimeEnvironment) {
 	console.log(
 		'constructor args:' + factory.interface.encodeDeploy([bytecodeHash])
 	);
-	// AA factory address: 0x771F394e184525dF90376C34922399Db2c4b504E
+	// AA factory address: 0x771F394e184525dF90376C34922399Db2c4b504E, 0x7724153EF95B1dA3F2c770dC6BfE56626fe7d339, 0xA015E20967741f10D6aAfE71C85cf638430d20aB,
+	// 0xEc6658b9b1bB97D19216311CCB58E1F69396f1D3
 	// constructor args:0x010004092e0545c6ebc485fb7a00d7f753347b34a91edb1c79ccccc12075ba3c
 }
