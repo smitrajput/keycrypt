@@ -20,6 +20,8 @@ contract TwoUserMultisig is IAccount, IERC1271 {
     // state variables for account owners
     address public owner1;
     address public owner2;
+    address public guardian1;
+    address public guardian2;
 
     modifier onlyBootloader() {
         require(
@@ -33,6 +35,11 @@ contract TwoUserMultisig is IAccount, IERC1271 {
     constructor(address _owner1, address _owner2) {
         owner1 = _owner1;
         owner2 = _owner2;
+    }
+
+    function changeOwner1(address _newOwner) external {
+        require(msg.sender == owner1, "!owner1");
+        owner1 = _newOwner;
     }
 
     function validateTransaction(
