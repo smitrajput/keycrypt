@@ -18,10 +18,24 @@ contract TwoUserMultisig is IAccount, IERC1271 {
     bytes4 constant EIP1271_SUCCESS_RETURN_VALUE = 0x1626ba7e;
 
     // state variables for account owners
-    address public owner1;
-    address public owner2;
+    address public owner;
     address public guardian1;
     address public guardian2;
+
+    struct AATx {
+        address to;
+        address from;
+        uint256 gasLimit;
+        uint256 gasPrice;
+        uint256 chainId;
+        uint256 nonce;
+        uint256 typee;
+        Eip712Meta customData;
+        uint256 value;
+    }
+    struct Eip712Meta {
+        uint256 gasPerPubdata;
+    }
 
     modifier onlyBootloader() {
         require(
@@ -32,14 +46,15 @@ contract TwoUserMultisig is IAccount, IERC1271 {
         _;
     }
 
-    constructor(address _owner1, address _owner2) {
-        owner1 = _owner1;
-        owner2 = _owner2;
+    constructor(address _owner, address _guardian1, address _guardian2) {
+        owner = _owner;
+        guardian1 = _guardian1;
+        guardian2 = _guardian2;
     }
 
-    function changeOwner1(address _newOwner) external {
-        require(msg.sender == owner1, "!owner1");
-        owner1 = _newOwner;
+    function changeOwner(address _newOwner) external {
+        require(msg.sender == address(this), "!authorised");
+        owner = _newOwner;
     }
 
     function validateTransaction(
@@ -138,17 +153,44 @@ contract TwoUserMultisig is IAccount, IERC1271 {
             _signature[129] = bytes1(uint8(27));
         }
 
-        (bytes memory signature1, bytes memory signature2) = extractECDSASignature(_signature);
+        if(_signature.length == 65) {
 
-        if(!checkValidECDSASignatureFormat(signature1) || !checkValidECDSASignatureFormat(signature2)) {
-            magic = bytes4(0);
-        }
+            if(!checkValidECDSASignatureFormat(_signature)) {
+                magic = bytes4(0);
+            }
+            address recoveredAddr = ECDSA.recover(_hash, _signature);
+            // Note, that we should abstain from using the require here in order to allow for fee estimation to work
+            if(recoveredAddr != owner) {
+                magic = bytes4(0);
+            }
+            // to disallow the owner from calling changeOwner()
+            {
+                AATx memory aaTx = abi.decode(abi.encodePacked(_hash), (AATx));
+                if(aaTx.to == address(this)) {
+                    magic = bytes4(0);
+                }
+            }
 
-        address recoveredAddr1 = ECDSA.recover(_hash, signature1);
-        address recoveredAddr2 = ECDSA.recover(_hash, signature2);
+        } else if(_signature.length == 130) {
 
-        // Note, that we should abstain from using the require here in order to allow for fee estimation to work
-        if(recoveredAddr1 != owner1 || recoveredAddr2 != owner2) {
+            (bytes memory signature1, bytes memory signature2) = extractECDSASignature(_signature);
+            if(!checkValidECDSASignatureFormat(signature1) || !checkValidECDSASignatureFormat(signature2)) {
+                magic = bytes4(0);
+            }
+            address recoveredAddr1 = ECDSA.recover(_hash, signature1);
+            address recoveredAddr2 = ECDSA.recover(_hash, signature2);
+
+            // Note, that we should abstain from using the require here in order to allow for fee estimation to work
+            // recoveredAddr1 and recoveredAddr2 both need to be either owner or guardian1 or guardian2,
+            // to ensure 2/3 multisig
+            if(recoveredAddr1 != owner && recoveredAddr1 != guardian1 && recoveredAddr1 != guardian2) {
+                magic = bytes4(0);
+            } else if(recoveredAddr2 != owner && recoveredAddr2 != guardian1 && recoveredAddr2 != guardian2) {
+                magic = bytes4(0);
+            } else if(recoveredAddr1 == recoveredAddr2) {
+                magic = bytes4(0);
+            } 
+        } else {
             magic = bytes4(0);
         }
     }
