@@ -169,7 +169,7 @@ contract Keycrypt is IAccount, IERC1271 {
                     magic = bytes4(0);
                 }
                 if(magic != bytes4(0)) {
-                    // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, then set magic = bytes4(0)
+                    // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
                     // extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
                     bytes4 functionSelector;
                     address to;
@@ -187,7 +187,6 @@ contract Keycrypt is IAccount, IERC1271 {
                     }
                 }
             }
-
         } else if(_signature.length == 130) {
 
             (bytes memory signature1, bytes memory signature2) = extractECDSASignature(_signature);
