@@ -7,8 +7,8 @@ export default async function (hre: HardhatRuntimeEnvironment) {
 	const PRIVATE_KEY: string = process.env.ZKS_PRIVATE_KEY || '';
 	const wallet = new Wallet(PRIVATE_KEY);
 	const deployer = new Deployer(hre, wallet);
-	const factoryArtifact = await deployer.loadArtifact('AAFactory');
-	const aaArtifact = await deployer.loadArtifact('TwoUserMultisig');
+	const factoryArtifact = await deployer.loadArtifact('Factory');
+	const aaArtifact = await deployer.loadArtifact('Keycrypt');
 
 	// Getting the bytecodeHash of the account
 	const bytecodeHash = utils.hashBytecode(aaArtifact.bytecode);

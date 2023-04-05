@@ -2,8 +2,8 @@ import {utils, Wallet, Provider, EIP712Signer, types} from 'zksync-web3';
 import * as ethers from 'ethers';
 import {HardhatRuntimeEnvironment} from 'hardhat/types';
 
-// Put the address of your AA factory
-const AA_FACTORY_ADDRESS = '0x7Bae133d541Ac388BCdF17C72436ebbb625F94bF';
+// Put the address of your factory
+const FACTORY_ADDRESS = '0x7Bae133d541Ac388BCdF17C72436ebbb625F94bF';
 
 export default async function (hre: HardhatRuntimeEnvironment) {
 	const provider = new Provider('https://zksync2-testnet.zksync.dev');
@@ -14,10 +14,10 @@ export default async function (hre: HardhatRuntimeEnvironment) {
 	const PRIVATE_KEY_4: string = process.env.ZKS_PRIVATE_KEY_4 || '';
 
 	const wallet = new Wallet(PRIVATE_KEY).connect(provider);
-	const factoryArtifact = await hre.artifacts.readArtifact('AAFactory');
+	const factoryArtifact = await hre.artifacts.readArtifact('Factory');
 
 	const aaFactory = new ethers.Contract(
-		AA_FACTORY_ADDRESS,
+		FACTORY_ADDRESS,
 		factoryArtifact.abi,
 		wallet
 	);
@@ -39,7 +39,7 @@ export default async function (hre: HardhatRuntimeEnvironment) {
 	// Getting the address of the deployed contract
 	const abiCoder = new ethers.utils.AbiCoder();
 	const multisigAddress = utils.create2Address(
-		AA_FACTORY_ADDRESS,
+		FACTORY_ADDRESS,
 		await aaFactory.aaBytecodeHash(),
 		salt,
 		abiCoder.encode(['address', 'address'], [owner1.address, owner2.address])

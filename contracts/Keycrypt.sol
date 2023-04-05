@@ -7,11 +7,10 @@ import "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHe
 import "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 // to call non-view method of system contracts
 import "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
-
 import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract TwoUserMultisig is IAccount, IERC1271 {
+contract Keycrypt is IAccount, IERC1271 {
     // to get transaction hash
     using TransactionHelper for Transaction;
 
@@ -21,21 +20,8 @@ contract TwoUserMultisig is IAccount, IERC1271 {
     address public owner;
     address public guardian1;
     address public guardian2;
+    mapping(address => bool) public isWhitelisted;
 
-    struct AATx {
-        address to;
-        address from;
-        uint256 gasLimit;
-        uint256 gasPrice;
-        uint256 chainId;
-        uint256 nonce;
-        uint256 typee;
-        Eip712Meta customData;
-        uint256 value;
-    }
-    struct Eip712Meta {
-        uint256 gasPerPubdata;
-    }
 
     modifier onlyBootloader() {
         require(
@@ -55,6 +41,20 @@ contract TwoUserMultisig is IAccount, IERC1271 {
     function changeOwner(address _newOwner) external {
         require(msg.sender == address(this), "!authorised");
         owner = _newOwner;
+    }
+
+    function addToWhitelist(address[] calldata _addresses) external {
+        require(msg.sender == address(this), "!authorised");
+        for (uint256 i = 0; i < _addresses.length; i++) {
+            isWhitelisted[_addresses[i]] = true;
+        }
+    }
+
+    function removeFromWhitelist(address[] calldata _addresses) external {
+        require(msg.sender == address(this), "!authorised");
+        for (uint256 i = 0; i < _addresses.length; i++) {
+            isWhitelisted[_addresses[i]] = false;
+        }
     }
 
     function validateTransaction(
@@ -162,12 +162,29 @@ contract TwoUserMultisig is IAccount, IERC1271 {
             // Note, that we should abstain from using the require here in order to allow for fee estimation to work
             if(recoveredAddr != owner) {
                 magic = bytes4(0);
-            }
-            // to disallow the owner from calling changeOwner()
-            {
-                AATx memory aaTx = abi.decode(abi.encodePacked(_hash), (AATx));
-                if(aaTx.to == address(this)) {
+            } else {
+                // to disallow the owner from calling changeOwner()
+                Transaction memory txn = abi.decode(abi.encodePacked(_hash), (Transaction));
+                if(txn.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
                     magic = bytes4(0);
+                }
+                if(magic != bytes4(0)) {
+                    // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, then set magic = bytes4(0)
+                    // extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
+                    bytes4 functionSelector;
+                    address to;
+                    assembly {
+                        functionSelector := mload(add(txn.data, 0x20))
+                        to := mload(add(txn.data, 0x40))
+                    }
+                    if((functionSelector == bytes4(keccak256("transfer(address,uint256)")) || 
+                        functionSelector == bytes4(keccak256("safeTransfer(address,uint256)")) || 
+                        functionSelector == bytes4(keccak256("approve(address,uint256)")) || 
+                        functionSelector == bytes4(keccak256("safeApprove(address,uint256)"))
+                        ) && (!isWhitelisted[to])
+                    ) {
+                        magic = bytes4(0);
+                    }
                 }
             }
 
