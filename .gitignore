@@ -3,3 +3,4 @@ node_modules
 artifacts-zk
 cache-zk
 build
+out

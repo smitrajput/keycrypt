@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
 import "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
@@ -171,20 +171,20 @@ contract Keycrypt is IAccount, IERC1271 {
                 if(magic != bytes4(0)) {
                     // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
                     // extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
-                    bytes4 functionSelector;
-                    address to;
-                    assembly {
-                        functionSelector := mload(add(txn.data, 0x20))
-                        to := mload(add(txn.data, 0x40))
-                    }
-                    if((functionSelector == bytes4(keccak256("transfer(address,uint256)")) || 
-                        functionSelector == bytes4(keccak256("safeTransfer(address,uint256)")) || 
-                        functionSelector == bytes4(keccak256("approve(address,uint256)")) || 
-                        functionSelector == bytes4(keccak256("safeApprove(address,uint256)"))
-                        ) && (!isWhitelisted[to])
-                    ) {
-                        magic = bytes4(0);
-                    }
+                    // bytes4 functionSelector;
+                    // address to;
+                    // assembly {
+                    //     functionSelector := mload(add(txn.data, 0x20))
+                    //     to := mload(add(txn.data, 0x40))
+                    // }
+                    // if((functionSelector == bytes4(keccak256("transfer(address,uint256)")) || 
+                    //     functionSelector == bytes4(keccak256("safeTransfer(address,uint256)")) || 
+                    //     functionSelector == bytes4(keccak256("approve(address,uint256)")) || 
+                    //     functionSelector == bytes4(keccak256("safeApprove(address,uint256)"))
+                    //     ) && (!isWhitelisted[to])
+                    // ) {
+                    //     magic = bytes4(0);
+                    // }
                 }
             }
         } else if(_signature.length == 130) {

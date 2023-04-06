@@ -1,4 +1,7 @@
 # keycrypt
-If only you had a billion dollies and you could store all of it in one single wallet.
-If only there existed an unhackable wallet, that would let the whales sleep peacefully.
-If only...
+A(n almost) hackproof crypto smart wallet, featuring: <br/>
+• native account-abstraction capabilities on zkSync <br/>
+• social recovery <br/>
+• 1/1 multisig behaviour for whitelisted interactions <br/>
+• 2/3 multisig behaviour for changing the current owner and non-whitelisted interactions <br/>
+

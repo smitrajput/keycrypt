@@ -6,7 +6,7 @@ dotenv.config();
 
 module.exports = {
 	zksolc: {
-		version: '1.3.1',
+		version: '1.3.8',
 		compilerSource: 'binary',
 		settings: {
 			isSystem: true,
@@ -32,9 +32,9 @@ module.exports = {
 			// {
 			// 	version: '0.8.18',
 			// },
-			// {
-			// 	version: '0.8.19',
-			// }
+			{
+				version: '0.8.19',
+			}
 		]
 	},
 };
