@@ -1,5 +1,5 @@
 # keycrypt
-A hackproof crypto smart wallet, featuring: <br/>
+### A hackproof crypto smart wallet, featuring: <br/>
 ✅ native account-abstraction capabilities on zkSync <br/>
 ✅ social recovery <br/>
 ✅ 1/1 multisig behaviour for whitelisted interactions <br/>
