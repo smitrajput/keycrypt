@@ -10,7 +10,7 @@ import "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContrac
 import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract Keycrypt is IAccount, IERC1271 {
+contract ZKS_Keycrypt is IAccount, IERC1271 {
     // to get transaction hash
     using TransactionHelper for Transaction;
 

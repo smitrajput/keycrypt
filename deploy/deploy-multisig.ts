@@ -14,7 +14,7 @@ export default async function (hre: HardhatRuntimeEnvironment) {
 	const PRIVATE_KEY_4: string = process.env.ZKS_PRIVATE_KEY_4 || '';
 
 	const wallet = new Wallet(PRIVATE_KEY).connect(provider);
-	const factoryArtifact = await hre.artifacts.readArtifact('Factory');
+	const factoryArtifact = await hre.artifacts.readArtifact('ZKS_Factory');
 
 	const aaFactory = new ethers.Contract(
 		FACTORY_ADDRESS,
