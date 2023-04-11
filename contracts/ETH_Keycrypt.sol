@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
 /* solhint-disable avoid-low-level-calls */
@@ -25,38 +25,68 @@ contract ETH_Keycrypt is ETH_BaseAccount, UUPSUpgradeable, Initializable {
     //explicit sizes of nonce, to fit a single storage cell with "owner"
     uint96 private _nonce;
     address public owner;
-
+    address public guardian1;
+    address public guardian2;
+    mapping(address => bool) public isWhitelisted;
     IEntryPoint private immutable _entryPoint;
 
-    event ETH_KeycryptInitialized(IEntryPoint indexed entryPoint, address indexed owner);
+    event ETH_KeycryptInitialized(IEntryPoint indexed entryPoint, address indexed owner, address guardian1, address guardian2);
 
     modifier onlyOwner() {
         _onlyOwner();
         _;
     }
 
-    /// @inheritdoc ETH_BaseAccount
-    function nonce() public view virtual override returns (uint256) {
-        return _nonce;
-    }
-
-    /// @inheritdoc ETH_BaseAccount
-    function entryPoint() public view virtual override returns (IEntryPoint) {
-        return _entryPoint;
-    }
-
-
-    // solhint-disable-next-line no-empty-blocks
-    receive() external payable {}
-
     constructor(IEntryPoint anEntryPoint) {
         _entryPoint = anEntryPoint;
         _disableInitializers();
     }
 
-    function _onlyOwner() internal view {
-        //directly from EOA owner, or through the account itself (which gets redirected through execute())
-        require(msg.sender == owner || msg.sender == address(this), "only owner");
+    /**
+     * @dev The _entryPoint member is immutable, to reduce gas consumption.  To upgrade EntryPoint,
+     * a new implementation of ETH_Keycrypt must be deployed with the new EntryPoint address, then upgrading
+      * the implementation by calling `upgradeTo()`
+     */
+    function initialize(address _owner, address _guardian1, address _guardian2) public virtual initializer {
+        owner = _owner;
+        guardian1 = _guardian1;
+        guardian2 = _guardian2;
+        emit ETH_KeycryptInitialized(_entryPoint, owner, guardian1, guardian2);
+    }
+
+    function changeOwner(address _newOwner) external {
+        require(msg.sender == address(entryPoint()), "!authorised");
+        owner = _newOwner;
+    }
+
+    function addToWhitelist(address[] calldata _addresses) external {
+        require(msg.sender == address(entryPoint()), "!authorised");
+        for (uint256 i = 0; i < _addresses.length; i++) {
+            isWhitelisted[_addresses[i]] = true;
+        }
+    }
+
+    function removeFromWhitelist(address[] calldata _addresses) external {
+        require(msg.sender == address(entryPoint()), "!authorised");
+        for (uint256 i = 0; i < _addresses.length; i++) {
+            isWhitelisted[_addresses[i]] = false;
+        }
+    }
+
+    /**
+     * deposit more funds for this account in the entryPoint
+     */
+    function addDeposit() public payable {
+        entryPoint().depositTo{value : msg.value}(address(this));
+    }
+
+    /**
+     * withdraw value from the account's deposit
+     * @param withdrawAddress target to send to
+     * @param amount to withdraw
+     */
+    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
+        entryPoint().withdrawTo(withdrawAddress, amount);
     }
 
     /**
@@ -76,25 +106,6 @@ contract ETH_Keycrypt is ETH_BaseAccount, UUPSUpgradeable, Initializable {
         for (uint256 i = 0; i < dest.length; i++) {
             _call(dest[i], 0, func[i]);
         }
-    }
-
-    /**
-     * @dev The _entryPoint member is immutable, to reduce gas consumption.  To upgrade EntryPoint,
-     * a new implementation of ETH_Keycrypt must be deployed with the new EntryPoint address, then upgrading
-      * the implementation by calling `upgradeTo()`
-     */
-    function initialize(address anOwner) public virtual initializer {
-        _initialize(anOwner);
-    }
-
-    function _initialize(address anOwner) internal virtual {
-        owner = anOwner;
-        emit ETH_KeycryptInitialized(_entryPoint, owner);
-    }
-
-    // Require the function call went through EntryPoint or owner
-    function _requireFromEntryPointOrOwner() internal view {
-        require(msg.sender == address(entryPoint()) || msg.sender == owner, "account: not Owner or EntryPoint");
     }
 
     /// implement template method of ETH_BaseAccount
@@ -127,24 +138,31 @@ contract ETH_Keycrypt is ETH_BaseAccount, UUPSUpgradeable, Initializable {
         return entryPoint().balanceOf(address(this));
     }
 
-    /**
-     * deposit more funds for this account in the entryPoint
-     */
-    function addDeposit() public payable {
-        entryPoint().depositTo{value : msg.value}(address(this));
+    /// @inheritdoc ETH_BaseAccount
+    function nonce() public view virtual override returns (uint256) {
+        return _nonce;
     }
 
-    /**
-     * withdraw value from the account's deposit
-     * @param withdrawAddress target to send to
-     * @param amount to withdraw
-     */
-    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
-        entryPoint().withdrawTo(withdrawAddress, amount);
+    /// @inheritdoc ETH_BaseAccount
+    function entryPoint() public view virtual override returns (IEntryPoint) {
+        return _entryPoint;
+    }
+
+    // Require the function call went through EntryPoint or owner
+    function _requireFromEntryPointOrOwner() internal view {
+        require(msg.sender == address(entryPoint()) || msg.sender == owner, "account: not Owner or EntryPoint");
+    }
+
+    function _onlyOwner() internal view {
+        //directly from EOA owner, or through the account itself (which gets redirected through execute())
+        require(msg.sender == owner || msg.sender == address(this), "only owner");
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override {
         (newImplementation);
         _onlyOwner();
     }
+
+    // solhint-disable-next-line no-empty-blocks
+    receive() external payable {}
 }
