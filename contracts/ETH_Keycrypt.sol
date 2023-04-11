@@ -8,6 +8,7 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
 import "./ETH_BaseAccount.sol";
 
@@ -15,8 +16,10 @@ import "./ETH_BaseAccount.sol";
   *  this account has execute, eth handling methods
   *  has a single signer that can send requests through the entryPoint.
   */
-contract ETH_Keycrypt is ETH_BaseAccount, UUPSUpgradeable, Initializable {
+contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializable {
     using ECDSA for bytes32;
+    // constant's storage slot will be ignored iirc
+    bytes4 constant EIP1271_SUCCESS_RETURN_VALUE = 0x1626ba7e;
 
     //filler member, to push the nonce and owner to the same slot
     // the "Initializeble" class takes 2 bytes in the first slot
@@ -114,12 +117,18 @@ contract ETH_Keycrypt is ETH_BaseAccount, UUPSUpgradeable, Initializable {
     }
 
     /// implement template method of ETH_BaseAccount
-    function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash)
-    internal override virtual returns (uint256 validationData) {
+    function _validateSignature(
+        UserOperation calldata userOp,
+        bytes32 userOpHash
+    ) internal override virtual returns (uint256 validationData) {
         bytes32 hash = userOpHash.toEthSignedMessageHash();
-        if (owner != hash.recover(userOp.signature))
+        // if (owner != hash.recover(userOp.signature))
+        //     return SIG_VALIDATION_FAILED;
+        if(isValidSignature(hash, userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE) {
+            return 0;
+        } else {
             return SIG_VALIDATION_FAILED;
-        return 0;
+        }
     }
 
     function _call(address target, uint256 value, bytes memory data) internal {
@@ -128,6 +137,82 @@ contract ETH_Keycrypt is ETH_BaseAccount, UUPSUpgradeable, Initializable {
             assembly {
                 revert(add(result, 32), mload(result))
             }
+        }
+    }
+
+    function isValidSignature(
+        bytes32 _hash,
+        bytes memory _signature
+    ) public view override returns (bytes4 magic) {
+        magic = EIP1271_SUCCESS_RETURN_VALUE;
+
+        // verify if fee estimation on eth is same as on zkSync
+        // if (_signature.length != 130) {
+        //     // Signature is invalid, but we need to proceed with the signature verification as usual
+        //     // in order for the fee estimation to work correctly
+        //     _signature = new bytes(130);
+            
+        //     // Making sure that the signatures look like a valid ECDSA signature and are not rejected rightaway
+        //     // while skipping the main verification process.
+        //     _signature[64] = bytes1(uint8(27));
+        //     _signature[129] = bytes1(uint8(27));
+        // }
+
+        if(_signature.length == 65) {
+
+            if(!_checkValidECDSASignatureFormat(_signature)) {
+                magic = bytes4(0);
+            }
+            address recoveredAddr = _hash.recover(_signature);
+            // Note, that we should abstain from using the require here in order to allow for fee estimation to work
+            if(recoveredAddr != owner) {
+                magic = bytes4(0);
+            } else {
+                // to disallow the owner from calling changeOwner()
+                // Transaction memory txn = abi.decode(abi.encodePacked(_hash), (Transaction));
+                // if(txn.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
+                //     magic = bytes4(0);
+                // }
+                // if(magic != bytes4(0)) {
+                //     extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
+                //     extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
+                //     bytes4 functionSelector;
+                //     address to;
+                //     assembly {
+                //         functionSelector := mload(add(txn.data, 0x20))
+                //         to := mload(add(txn.data, 0x40))
+                //     }
+                //     if((functionSelector == bytes4(keccak256("transfer(address,uint256)")) || 
+                //         functionSelector == bytes4(keccak256("safeTransfer(address,uint256)")) || 
+                //         functionSelector == bytes4(keccak256("approve(address,uint256)")) || 
+                //         functionSelector == bytes4(keccak256("safeApprove(address,uint256)"))
+                //         ) && (!isWhitelisted[to])
+                //     ) {
+                //         magic = bytes4(0);
+                //     }
+                // }
+            }
+        } else if(_signature.length == 130) {
+
+            (bytes memory signature1, bytes memory signature2) = _extractECDSASignature(_signature);
+            if(!_checkValidECDSASignatureFormat(signature1) || !_checkValidECDSASignatureFormat(signature2)) {
+                magic = bytes4(0);
+            }
+            address recoveredAddr1 = _hash.recover(_signature);
+            address recoveredAddr2 = _hash.recover(_signature);
+
+            // Note, that we should abstain from using the require here in order to allow for fee estimation to work
+            // recoveredAddr1 and recoveredAddr2 both need to be either owner or guardian1 or guardian2,
+            // to ensure 2/3 multisig
+            if(recoveredAddr1 != owner && recoveredAddr1 != guardian1 && recoveredAddr1 != guardian2) {
+                magic = bytes4(0);
+            } else if(recoveredAddr2 != owner && recoveredAddr2 != guardian1 && recoveredAddr2 != guardian2) {
+                magic = bytes4(0);
+            } else if(recoveredAddr1 == recoveredAddr2) {
+                magic = bytes4(0);
+            } 
+        } else {
+            magic = bytes4(0);
         }
     }
 
@@ -161,6 +246,81 @@ contract ETH_Keycrypt is ETH_BaseAccount, UUPSUpgradeable, Initializable {
     function _authorizeUpgrade(address newImplementation) internal view override {
         (newImplementation);
         _onlyOwner();
+    }
+
+    function _extractECDSASignature(
+        bytes memory _fullSignature
+    ) internal pure returns (bytes memory signature1, bytes memory signature2) {
+        require(_fullSignature.length == 130, "Invalid length");
+
+        signature1 = new bytes(65);
+        signature2 = new bytes(65);
+
+        // Copying the first signature. Note, that we need an offset of 0x20
+        // since it is where the length of the `_fullSignature` is stored
+        assembly {
+            let r := mload(add(_fullSignature, 0x20))
+            let s := mload(add(_fullSignature, 0x40))
+            let v := and(mload(add(_fullSignature, 0x41)), 0xff)
+
+            mstore(add(signature1, 0x20), r)
+            mstore(add(signature1, 0x40), s)
+            mstore8(add(signature1, 0x60), v)
+        }
+
+        // Copying the second signature.
+        assembly {
+            let r := mload(add(_fullSignature, 0x61))
+            let s := mload(add(_fullSignature, 0x81))
+            let v := and(mload(add(_fullSignature, 0x82)), 0xff)
+
+            mstore(add(signature2, 0x20), r)
+            mstore(add(signature2, 0x40), s)
+            mstore8(add(signature2, 0x60), v)
+        }
+    }
+
+    // This function verifies that the ECDSA signature is both in correct format and non-malleable
+    function _checkValidECDSASignatureFormat(
+        bytes memory _signature
+    ) internal pure returns (bool) {
+        if (_signature.length != 65) {
+            return false;
+        }
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        // Signature loading code
+        // we jump 32 (0x20) as the first slot of bytes contains the length
+        // we jump 65 (0x41) per signature
+        // for v we load 32 bytes ending with v (the first 31 come from s) then apply a mask
+        assembly {
+            r := mload(add(_signature, 0x20))
+            s := mload(add(_signature, 0x40))
+            v := and(mload(add(_signature, 0x41)), 0xff)
+        }
+        if (v != 27 && v != 28) {
+            return false;
+        }
+
+        // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+        // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+        // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+        // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+        //
+        // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+        // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+        // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+        // these malleable signatures as well.
+        if (
+            uint256(s) >
+            0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     // solhint-disable-next-line no-empty-blocks
