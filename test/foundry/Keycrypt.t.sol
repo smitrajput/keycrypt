@@ -32,24 +32,29 @@ contract KeycryptTest is Test {
         guardian1 = address(0x456);
         guardian2 = address(0x789);
         factory = new ETH_Factory(entryPoint);
-    }
-
-    function test_FactoryDotCreateAccount() public {
-        // counter.increment();
-        // assertEq(counter.number(), 1);
-        // INonceHolder nonceHolder = INonceHolder(0x0000000000000000000000000000000000008003);
-        // uint256 nonce = nonceHolder.getDeploymentNonce(0x7Bae133d541Ac388BCdF17C72436ebbb625F94bF);
         keycrypt = factory.createAccount(owner, guardian1, guardian2, 0);
-        console.log('keycrypt address:', address(keycrypt));
-        assertEq(keycrypt.owner(), owner);
-        //send 1 ETH to keycrypt
-        // vm.deal(address(keycrypt), 1 ether);
     }
 
     function test_ETH_KeycryptDotAddToWhitelist() public {
-        console.log('keycrypt balance:', address(keycrypt).balance);
+        vm.deal(address(keycrypt), 1 ether);
+        console.log('keycrypt balance:', address(keycrypt).balance / 1e18);
         console.log('keycrypt owner:', keycrypt.owner());
-        // entryPoint.
+        // create UserOperation struct
+        UserOperation memory userOp = UserOperation({
+            from: address(0x123),
+            to: address(0x456),
+            value: 0,
+
+            initCode: bytes(""),
+            callData: bytes(""),
+            callGas: 0,
+            callValue: 0,
+            nonce: 0,
+            signature: bytes(""),
+            extraData: bytes("")
+        });
+        entryPoint.handleOps(userOp, msg.sender);
+        keycrypt.addToWhitelist(address(0x123));
     }
 }
 
