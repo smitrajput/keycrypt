@@ -40,21 +40,24 @@ contract KeycryptTest is Test {
         console.log('keycrypt balance:', address(keycrypt).balance / 1e18);
         console.log('keycrypt owner:', keycrypt.owner());
         // create UserOperation struct
-        UserOperation memory userOp = UserOperation({
-            from: address(0x123),
-            to: address(0x456),
-            value: 0,
-
+        UserOperation[] memory userOp;
+        userOp[0] = UserOperation({
+            sender: address(0x123),
+            nonce: 0,
             initCode: bytes(""),
             callData: bytes(""),
-            callGas: 0,
-            callValue: 0,
-            nonce: 0,
-            signature: bytes(""),
-            extraData: bytes("")
+            callGasLimit: 0,
+            verificationGasLimit: 0,
+            preVerificationGas: 0,
+            maxFeePerGas: 0,
+            maxPriorityFeePerGas: 0,
+            paymasterAndData: bytes(""),
+            signature: bytes("")
         });
-        entryPoint.handleOps(userOp, msg.sender);
-        keycrypt.addToWhitelist(address(0x123));
+        entryPoint.handleOps(userOp, payable(msg.sender));
+        address[] memory addresses;
+        addresses[0] = address(0x123);
+        keycrypt.addToWhitelist(addresses);
     }
 }
 
