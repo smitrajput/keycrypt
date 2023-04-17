@@ -34,7 +34,6 @@ contract KeycryptTest is Test {
         guardian2 = address(0x789);
         factory = new ETH_Factory(entryPoint);
         keycrypt = factory.createAccount(owner, guardian1, guardian2, 0);
-        console.log("WHAT_UPDOG");
     }
 
     function test_ETH_KeycryptDotAddToWhitelist() public {
@@ -75,9 +74,7 @@ contract KeycryptTest is Test {
         addresses.push(0x6B175474E89094C44Da98b954EedeAC495271d0F);
         uint256 gas = gasleft();
         vm.prank(address(entryPoint));
-        console.log("1");
         keycrypt.addToWhitelist(addresses);
-        console.log("2");
         gas = gas - gasleft();
         console.log('gas used:', gas);
     }
