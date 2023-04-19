@@ -5,15 +5,6 @@ import "forge-std/Test.sol";
 import "../../contracts/ETH_Factory.sol";
 import "../../contracts/ETH_Keycrypt.sol";
 
-// interface INonceHolder {
-//     /// @dev Returns the deployment nonce for the accounts used for CREATE opcode.
-//     function getDeploymentNonce(address _address) external view returns (uint256);
-// }
-
-interface AnyswapV6Router {
-    /// @dev Returns the deployment nonce for the accounts used for CREATE opcode.
-    function mpc() external view returns (address);
-}
 
 contract KeycryptTest is Test {
     uint256 mainnetFork;
