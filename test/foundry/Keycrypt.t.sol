@@ -51,27 +51,13 @@ contract KeycryptTest is Test {
             maxPriorityFeePerGas: 60865874,
             paymasterAndData: bytes(""),
             // create signature signed by owner and guardian1, with signing data being userOp[0]
-
-
         });
         entryPoint.handleOps(userOp, payable(msg.sender));
         addresses[0] = address(0x123);
         keycrypt.addToWhitelist(addresses);
     }
-
-    function test_addToWhitelistGas() public {
-        addresses.push(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-        addresses.push(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-        addresses.push(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-        uint256 gas = gasleft();
-        vm.prank(address(entryPoint));
-        keycrypt.addToWhitelist(addresses);
-        gas = gas - gasleft();
-        console.log('gas used:', gas);
-    }
 }
 
-// write solidity code to initialise test setup for Keycrypt.sol by creating a new instance of Keycrypt and calling its constructor
 
 
 
