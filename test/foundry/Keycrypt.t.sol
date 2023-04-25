@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
 import "../../contracts/ETH_Factory.sol";
 import "../../contracts/ETH_Keycrypt.sol";
+import "forge-std/Test.sol";
+import "../../contracts/interfaces/UserOperation.sol";
 
 
 contract KeycryptTest is Test {
+    using UserOperationLib for UserOperation;
+
+    UserOperation userOpData;
     uint256 mainnetFork;
     ETH_Factory public factory;
     ETH_Keycrypt public keycrypt;
@@ -42,6 +46,21 @@ contract KeycryptTest is Test {
         // create calldata for addToWhitelist function
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
         // console.log('callData:', callData_);
+        userOpData = UserOperation({
+            sender: address(keycrypt),
+            nonce: 0,
+            initCode: "",
+            callData: callData_,
+            callGasLimit: 1000000,
+            verificationGasLimit: 1000000,
+            preVerificationGas: 1000000,
+            maxFeePerGas: 43683902336,
+            maxPriorityFeePerGas: 60865874,
+            paymasterAndData: "",
+            signature: ""
+        });
+        bytes32 userOpHash = keccak256(abi.encode(userOpData.hash(), address(this), block.chainid));
+        console.log('userOpHash:', userOpHash);
         // create UserOperation struct
         userOp.push(UserOperation({
             sender: address(keycrypt),
