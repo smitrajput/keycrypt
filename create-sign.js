@@ -7,7 +7,7 @@ const privateKey2 = process.env.ZKS_PRIVATE_KEY_2;
 
 const userOp = {
   sender: '0xaa49524B61e4AfC10c2202cB25040Da25401ae4E',
-  nonce: 1,
+  nonce: 0,
   initCode: '0x',
   callData: '0x0a4a015c7000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec70000000000000000000000006b175474e89094c44da98b954eedeac495271d0f',
   callGasLimit: 1000000,
@@ -16,7 +16,7 @@ const userOp = {
   maxFeePerGas: 43683902336,
   maxPriorityFeePerGas: 60865874,
   paymasterAndData: '0x',
-  signature: '0x',
+  // signature: '0x',
 };
 
 function createSignature(userOp, privateKey) {
