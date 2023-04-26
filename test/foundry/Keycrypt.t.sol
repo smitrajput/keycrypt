@@ -119,7 +119,32 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.owner(), newOwner);
     }
 
-    // function test_RevertOn_Calling
+    function test_addDeposit() public {
+        bytes memory callData_ = abi.encodeWithSignature("addDeposit()");
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
+        sign = abi.encodePacked(r, s, v);
+
+        userOp.push(UserOperation({
+            sender: address(keycrypt),
+            nonce: 0,
+            initCode: "",
+            callData: callData_,
+            callGasLimit: 1000000,
+            verificationGasLimit: 1000000,
+            preVerificationGas: 1000000,
+            maxFeePerGas: 43683902336,
+            maxPriorityFeePerGas: 60865874,
+            paymasterAndData: "",
+            signature: sign
+        }));
+
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        // assertEq(keycrypt.owner(), newOwner);
+    }
 
     // to generate the userOpHash along the lines of EntryPoint.getUserOpHash(), 
     // as expected by ETH_Keycrypt.isValidSignature(), which is signed by owner and 1 guardian

@@ -132,9 +132,103 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         // if (owner != hash.recover(userOp.signature))
         //     return SIG_VALIDATION_FAILED;
         if(isValidSignature(hash, userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE) {
+            _validatePermissions(userOp, hash);
             return 0;
         } else {
             return SIG_VALIDATION_FAILED;
+        }
+    }
+
+    function _validatePermissions(UserOperation calldata userOp, bytes32 _hash) internal returns (bool) {
+        // 1/1 multisig
+        /** Allowed interations:
+         *  1. addDeposit()
+         *  2. execute() for whitelisted 'dest' (hence also NOT this contract)
+         *      a. for 'dest' = token contracts, and 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+         *         func.to must be whitelisted
+         *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract)
+         *      b. for ALL 'dest' = token contracts, and CORRESPONDING 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+         *         ALL CORRESPONDING func.to must be whitelisted
+         */
+        if(userOp.signature.length == 65) {
+            address recoveredAddr = _hash.recover(userOp.signature);
+            // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
+            // UserOperation memory userOp = abi.decode(abi.encodePacked(_hash), (UserOperation));
+            bytes4 funcSig = bytes4(userOp.callData[:4]);
+            console.log('funcSig, addDeposit');
+            console.logBytes4(funcSig);
+            console.logBytes4(bytes4(keccak256("addDeposit()")));
+            if(funcSig == bytes4(keccak256("addDeposit()"))) {
+                return true;
+            }
+            if(funcSig == bytes4(keccak256("execute(address,uint256,bytes)"))) {
+                address dest;
+                uint256 value;
+                bytes memory func;
+                (dest, value, func) = abi.decode(userOp.callData[4:], (address, uint256, bytes));
+                if(isWhitelisted[dest]) {
+                    return true;
+                }
+            }
+            // if(funcSig == bytes4(keccak256("executeBatch(address[],bytes[])"))) {
+            //     address[] memory dest;
+            //     bytes[] memory func;
+            //     (dest, func) = abi.decode(userOp.callData[4:], (address[], bytes[]));
+            //     bool allWhitelisted = true;
+            //     for(uint256 i = 0; i < dest.length; i++) {
+            //         if(!isWhitelisted[dest[i]]) {
+            //             allWhitelisted = false;
+            //             break;
+            //         }
+            //     }
+            //     if(allWhitelisted) {
+            //         return true;
+            //     }
+            // }
+            // return false;
+       
+            // console.log('userOp.sender');
+            // console.log(userOp.sender);
+            // console.log('userOp.callData');
+            // console.logBytes(userOp.callData);
+            // if(userOp.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
+            //     magic = bytes4(0);
+            // }
+            // if(magic != bytes4(0)) {
+            //     // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
+            //     // extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
+            //     bytes4 functionSelector;
+            //     address to;
+            //     assembly {
+            //         functionSelector := mload(add(txn.data, 0x20))
+            //         to := mload(add(txn.data, 0x40))
+            //     }
+            //     if((functionSelector == bytes4(keccak256("transfer(address,uint256)")) || 
+            //         functionSelector == bytes4(keccak256("safeTransfer(address,uint256)")) || 
+            //         functionSelector == bytes4(keccak256("approve(address,uint256)")) || 
+            //         functionSelector == bytes4(keccak256("safeApprove(address,uint256)"))
+            //         ) && (!isWhitelisted[to])
+            //     ) {
+            //         magic = bytes4(0);
+            //     }
+            // }
+            }
+        // 2/3 multisig
+        /** Allowed interations:
+         *  1. addDepositTo()
+         *  2. execute() for ALL 'dest' (even this contract)
+         *  3. executeBatch() for ALL 'dest' (even this contract)
+         *  4. changeOwner()
+         *  5. addToWhitelist()
+         *  6. removeFromWhitelist()
+         *  7. withdrawDepositTo()
+         */
+        else if(userOp.signature.length == 130) {
+
+            (bytes memory signature1, bytes memory signature2) = _extractECDSASignature(userOp.signature);
+            address recoveredAddr1 = _hash.recover(signature1);
+            address recoveredAddr2 = _hash.recover(signature2);
+
         }
     }
 
@@ -165,18 +259,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         //     _signature[129] = bytes1(uint8(27));
         // }
 
-        // 1/1 multisig
-        /** Allowed interations:
-         *  1. addDepositTo()
-         *  2. execute() for whitelisted 'dest' (hence also NOT this contract)
-         *      a. for 'dest' = token contracts, and 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
-         *         func.to must be whitelisted
-         *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract)
-         *      b. for ALL 'dest' = token contracts, and CORRESPONDING 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
-         *         ALL CORRESPONDING func.to must be whitelisted
-         */
         if(_signature.length == 65) {
-
             if(!_checkValidECDSASignatureFormat(_signature)) {
                 magic = bytes4(0);
             }
@@ -184,43 +267,8 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             // Note, that we should abstain from using the require here in order to allow for fee estimation to work
             if(recoveredAddr != owner) {
                 magic = bytes4(0);
-            } else {
-                // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
-                UserOperation memory userOp = abi.decode(abi.encodePacked(_hash), (UserOperation));
-                if(userOp.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
-                    magic = bytes4(0);
-                }
-                // if(magic != bytes4(0)) {
-                //     // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
-                //     // extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
-                //     bytes4 functionSelector;
-                //     address to;
-                //     assembly {
-                //         functionSelector := mload(add(txn.data, 0x20))
-                //         to := mload(add(txn.data, 0x40))
-                //     }
-                //     if((functionSelector == bytes4(keccak256("transfer(address,uint256)")) || 
-                //         functionSelector == bytes4(keccak256("safeTransfer(address,uint256)")) || 
-                //         functionSelector == bytes4(keccak256("approve(address,uint256)")) || 
-                //         functionSelector == bytes4(keccak256("safeApprove(address,uint256)"))
-                //         ) && (!isWhitelisted[to])
-                //     ) {
-                //         magic = bytes4(0);
-                //     }
-                // }
             }
-        // 2/3 multisig
-        /** Allowed interations:
-         *  1. addDepositTo()
-         *  2. execute() for ALL 'dest' (even this contract)
-         *  3. executeBatch() for ALL 'dest' (even this contract)
-         *  4. changeOwner()
-         *  5. addToWhitelist()
-         *  6. removeFromWhitelist()
-         *  7. withdrawDepositTo()
-         */
         } else if(_signature.length == 130) {
-
             (bytes memory signature1, bytes memory signature2) = _extractECDSASignature(_signature);
             if(!_checkValidECDSASignatureFormat(signature1) || !_checkValidECDSASignatureFormat(signature2)) {
                 magic = bytes4(0);
