@@ -60,11 +60,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         emit ETH_KeycryptInitialized(_entryPoint, owner, guardian1, guardian2);
     }
 
+    // 2/3 multisig
     function changeOwner(address _newOwner) external {
         require(msg.sender == address(entryPoint()), "!authorised");
         owner = _newOwner;
     }
 
+    // 2/3 multisig
+    // NOTE: don't whitelist THIS contract, or it will be able to call itself
     function addToWhitelist(address[] calldata _addresses) external {
         require(msg.sender == address(entryPoint()), "!authorised");
         for (uint256 i = 0; i < _addresses.length; i++) {
@@ -72,6 +75,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         }
     }
 
+    // 2/3 multisig
     function removeFromWhitelist(address[] calldata _addresses) external {
         require(msg.sender == address(entryPoint()), "!authorised");
         for (uint256 i = 0; i < _addresses.length; i++) {
@@ -79,14 +83,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         }
     }
 
-    /**
+    /** 1/1 multisig
      * deposit more funds for this account in the entryPoint
      */
     function addDeposit() public payable {
         entryPoint().depositTo{value : msg.value}(address(this));
     }
 
-    /**
+    /** 2/3 multisig
      * withdraw value from the account's deposit
      * @param withdrawAddress target to send to
      * @param amount to withdraw
@@ -95,7 +99,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         entryPoint().withdrawTo(withdrawAddress, amount);
     }
 
-    /**
+    /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a transaction (called directly from owner, or by entryPoint)
      */
     function execute(address dest, uint256 value, bytes calldata func) external {
@@ -103,7 +107,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         _call(dest, value, func);
     }
 
-    /**
+    /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a sequence of transactions
      */
     function executeBatch(address[] calldata dest, bytes[] calldata func) external {
@@ -161,6 +165,16 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         //     _signature[129] = bytes1(uint8(27));
         // }
 
+        // 1/1 multisig
+        /** Allowed interations:
+         *  1. addDepositTo()
+         *  2. execute() for whitelisted 'dest' (hence also NOT this contract)
+         *      a. for 'dest' = token contracts, and 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+         *         func.to must be whitelisted
+         *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract)
+         *      b. for ALL 'dest' = token contracts, and CORRESPONDING 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+         *         ALL CORRESPONDING func.to must be whitelisted
+         */
         if(_signature.length == 65) {
 
             if(!_checkValidECDSASignatureFormat(_signature)) {
@@ -171,14 +185,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             if(recoveredAddr != owner) {
                 magic = bytes4(0);
             } else {
-                // to disallow the owner from calling changeOwner()
-                // Transaction memory txn = abi.decode(abi.encodePacked(_hash), (Transaction));
-                // if(txn.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
-                //     magic = bytes4(0);
-                // }
+                // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
+                UserOperation memory userOp = abi.decode(abi.encodePacked(_hash), (UserOperation));
+                if(userOp.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
+                    magic = bytes4(0);
+                }
                 // if(magic != bytes4(0)) {
-                //     extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
-                //     extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
+                //     // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
+                //     // extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
                 //     bytes4 functionSelector;
                 //     address to;
                 //     assembly {
@@ -195,6 +209,16 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                 //     }
                 // }
             }
+        // 2/3 multisig
+        /** Allowed interations:
+         *  1. addDepositTo()
+         *  2. execute() for ALL 'dest' (even this contract)
+         *  3. executeBatch() for ALL 'dest' (even this contract)
+         *  4. changeOwner()
+         *  5. addToWhitelist()
+         *  6. removeFromWhitelist()
+         *  7. withdrawDepositTo()
+         */
         } else if(_signature.length == 130) {
 
             (bytes memory signature1, bytes memory signature2) = _extractECDSASignature(_signature);

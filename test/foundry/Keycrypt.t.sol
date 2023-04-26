@@ -20,7 +20,7 @@ contract KeycryptTest is Test {
     address[] addresses;
     UserOperation[] userOp;
     bytes sign;
-    Hasher hasher;
+    Util util;
 
     function setUp() public {
         // create eth mainnet fork and deploy ETH_Factory.sol to it
@@ -33,7 +33,7 @@ contract KeycryptTest is Test {
         keycrypt = factory.createAccount(owner, guardian1, guardian2, 0);
         vm.deal(address(keycrypt), 1 ether);
         // sign = hex"edd79d1d9520e698e726b63b5a8959162da3a899727ae68d012bdb60000093b17348db30ff8fae84ed1418b657f1e1b15ee299e725f0b497a2addffcf7ea705f1c7e5d7426781b7c4792ce12b5b1d19d0809a29e9e66a92493dbc41120df47d14204aa73c3abba722cd6b3fa367889881ca0303d6562e1b55930547eb950bc62db1c";
-        hasher = new Hasher();
+        util = new Util();
     }
 
     function test_addToWhitelist() public {
@@ -119,6 +119,8 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.owner(), newOwner);
     }
 
+    // function test_RevertOn_Calling
+
     // to generate the userOpHash along the lines of EntryPoint.getUserOpHash(), 
     // as expected by ETH_Keycrypt.isValidSignature(), which is signed by owner and 1 guardian
     function createUserOpHash(bytes memory _callData) public view returns(bytes32 userOpHash){
@@ -135,14 +137,14 @@ contract KeycryptTest is Test {
             paymasterAndData: "",
             signature: ""
         });
-        userOpHash = keccak256(abi.encode(hasher.hash(userOpData), address(entryPoint), block.chainid));
+        userOpHash = keccak256(abi.encode(util.hash(userOpData), address(entryPoint), block.chainid));
         // console.logBytes32(userOpHash);
     }
 
     // receive() external payable {}
 }
 
-contract Hasher {
+contract Util {
     function pack(UserOperation calldata _userOp) internal pure returns (bytes memory ret) {
         //lighter signature scheme. must match UserOp.ts#packUserOp
         bytes calldata sig = _userOp.signature;
