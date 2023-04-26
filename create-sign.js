@@ -48,7 +48,9 @@ function createSignature(userOp, privateKey) {
     ]
   );
 
-  return wallet.signMessage(ethers.utils.arrayify(dataToSign));
+  const newData = '0x4675f0f7e006d94cd1a23e2a93040aa2c25fa70a561ef98231395ee96041aedd';
+
+  return wallet.signMessage(ethers.utils.arrayify(newData));
 }
 
 (async () => {

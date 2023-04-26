@@ -198,26 +198,22 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         } else if(_signature.length == 130) {
 
             (bytes memory signature1, bytes memory signature2) = _extractECDSASignature(_signature);
-            console.logBytes(signature1);
-            console.logBytes(signature2);
             if(!_checkValidECDSASignatureFormat(signature1) || !_checkValidECDSASignatureFormat(signature2)) {
                 magic = bytes4(0);
             }
             address recoveredAddr1 = _hash.recover(signature1);
             address recoveredAddr2 = _hash.recover(signature2);
-            console.log('recoveredAddr1: ', recoveredAddr1);
-            console.log('recoveredAddr2: ', recoveredAddr2);
 
             // Note, that we should abstain from using the require here in order to allow for fee estimation to work
             // recoveredAddr1 and recoveredAddr2 both need to be either owner or guardian1 or guardian2,
             // to ensure 2/3 multisig
-            // if(recoveredAddr1 != owner && recoveredAddr1 != guardian1 && recoveredAddr1 != guardian2) {
-            //     magic = bytes4(0);
-            // } else if(recoveredAddr2 != owner && recoveredAddr2 != guardian1 && recoveredAddr2 != guardian2) {
-            //     magic = bytes4(0);
-            // } else if(recoveredAddr1 == recoveredAddr2) {
-            //     magic = bytes4(0);
-            // } 
+            if(recoveredAddr1 != owner && recoveredAddr1 != guardian1 && recoveredAddr1 != guardian2) {
+                magic = bytes4(0);
+            } else if(recoveredAddr2 != owner && recoveredAddr2 != guardian1 && recoveredAddr2 != guardian2) {
+                magic = bytes4(0);
+            } else if(recoveredAddr1 == recoveredAddr2) {
+                magic = bytes4(0);
+            } 
         } else {
             magic = bytes4(0);
         }
