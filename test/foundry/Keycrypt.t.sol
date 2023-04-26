@@ -31,12 +31,12 @@ contract KeycryptTest is Test {
         guardian2 = vm.addr(21);
         factory = new ETH_Factory(entryPoint);
         keycrypt = factory.createAccount(owner, guardian1, guardian2, 0);
+        vm.deal(address(keycrypt), 1 ether);
         // sign = hex"edd79d1d9520e698e726b63b5a8959162da3a899727ae68d012bdb60000093b17348db30ff8fae84ed1418b657f1e1b15ee299e725f0b497a2addffcf7ea705f1c7e5d7426781b7c4792ce12b5b1d19d0809a29e9e66a92493dbc41120df47d14204aa73c3abba722cd6b3fa367889881ca0303d6562e1b55930547eb950bc62db1c";
         hasher = new Hasher();
     }
 
     function test_addToWhitelist() public {
-        vm.deal(address(keycrypt), 1 ether);
         console.log('keycrypt balance:', address(keycrypt).balance / 1e18);
         console.log('keycrypt owner:', keycrypt.owner());
         console.log('keycrypt address:', address(keycrypt));
@@ -55,11 +55,11 @@ contract KeycryptTest is Test {
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
         // call createUserOpHash(callData_); and sign the output with owner and guardian1 off-chain
         bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
         bytes memory sign1 = abi.encodePacked(r, s, v);
         (v, r, s) = vm.sign(20, userOpHash);
         bytes memory sign2 = abi.encodePacked(r, s, v);
-
         sign = abi.encodePacked(sign1, sign2);
         // create UserOperation struct with signature created above and set to 'sign' variable
         userOp.push(UserOperation({
@@ -84,40 +84,40 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.isWhitelisted(addresses[2]), true);
     }
 
-    // function test_changeOwner() public {
-    //     assertEq(keycrypt.owner(), owner);
+    function test_changeOwner() public {
+        assertEq(keycrypt.owner(), owner);
 
-    //     address mockOwner = vm.addr(22);
-    //     bytes memory callData_ = abi.encodeWithSignature("changeOwner(address)", mockOwner);
-    //     bytes32 userOpHash = createUserOpHash(callData_);
+        newOwner = vm.addr(22);
+        bytes memory callData_ = abi.encodeWithSignature("changeOwner(address)", newOwner);
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
 
-    //     (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
-    //     bytes memory sign1 = abi.encodePacked(v, r, s);
-    //     (v, r, s) = vm.sign(20, userOpHash);
-    //     bytes memory sign2 = abi.encodePacked(v, r, s);
-    //     sign = abi.encodePacked(sign1, sign2);
-    //     console.log('changeOwner sign');
-    //     console.logBytes(sign);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
+        bytes memory sign1 = abi.encodePacked(r, s, v);
+        (v, r, s) = vm.sign(20, userOpHash);
+        bytes memory sign2 = abi.encodePacked(r, s, v);
+        sign = abi.encodePacked(sign1, sign2);
 
-    //     userOp[0] = UserOperation({
-    //         sender: address(keycrypt),
-    //         nonce: 0,
-    //         initCode: "",
-    //         callData: callData_,
-    //         callGasLimit: 1000000,
-    //         verificationGasLimit: 1000000,
-    //         preVerificationGas: 1000000,
-    //         maxFeePerGas: 43683902336,
-    //         maxPriorityFeePerGas: 60865874,
-    //         paymasterAndData: "",
-    //         signature: sign
-    //     });
+        // no need to pop previous userOp[0] as every test starts on a fresh state
+        // userOp.pop();
+        userOp.push(UserOperation({
+            sender: address(keycrypt),
+            nonce: 0,
+            initCode: "",
+            callData: callData_,
+            callGasLimit: 1000000,
+            verificationGasLimit: 1000000,
+            preVerificationGas: 1000000,
+            maxFeePerGas: 43683902336,
+            maxPriorityFeePerGas: 60865874,
+            paymasterAndData: "",
+            signature: sign
+        }));
 
-    //     // simulate the bundler calling handleOps on entryPoint
-    //     entryPoint.handleOps(userOp, payable(msg.sender));
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
 
-    //     assertEq(keycrypt.owner(), mockOwner);
-    // }
+        assertEq(keycrypt.owner(), newOwner);
+    }
 
     // to generate the userOpHash along the lines of EntryPoint.getUserOpHash(), 
     // as expected by ETH_Keycrypt.isValidSignature(), which is signed by owner and 1 guardian
