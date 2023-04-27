@@ -90,7 +90,8 @@ contract KeycryptTest is Test {
     }
 
     function test_execute() public {
-        bytes memory callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", DAI, 0, abi.encodeWithSignature("approve()", guardian1, 1e18));
+        console.log('GUARDIAN1', guardian1);
+        bytes memory callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", DAI, 0, abi.encodeWithSignature("approve(address,uint256)", guardian1, 1e18));
         sign = _oneOfOneSign(callData_);
 
         _submitUserOp(callData_, sign);
@@ -103,10 +104,11 @@ contract KeycryptTest is Test {
         addresses.push(USDC);
         addresses.push(USDT);
 
-        funcSigs.push(abi.encodeWithSignature("approve()", owner, 1e18));
-        funcSigs.push(abi.encodeWithSignature("approve()", guardian1, 1e18));
-        funcSigs.push(abi.encodeWithSignature("approve()", guardian2, 1e18));
-        
+        funcSigs.push(abi.encodeWithSignature("approve(address,uint256)", owner, 1e18));
+        funcSigs.push(abi.encodeWithSignature("approve(address,uint256)", guardian1, 1e18));
+        funcSigs.push(abi.encodeWithSignature("approve(address,uint256)", guardian2, 1e18));
+
+        console.log('OWNER', owner);
         bytes memory callData_ = abi.encodeWithSignature("executeBatch(address[],bytes[])", addresses, funcSigs);
         sign = _oneOfOneSign(callData_);
 
@@ -169,7 +171,6 @@ contract KeycryptTest is Test {
             signature: ""
         });
         userOpHash = keccak256(abi.encode(util.hash(userOpData), address(entryPoint), block.chainid));
-        // console.logBytes32(userOpHash);
     }
 
     // receive() external payable {}

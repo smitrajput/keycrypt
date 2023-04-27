@@ -144,11 +144,11 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         /** Allowed interations:
          *  1. addDeposit()
          *  2. execute() for whitelisted 'dest' (hence also NOT this contract)
-         *      a. for 'dest' = token contracts, and 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
-         *         func.to must be whitelisted
+         *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+         *         then func.to must be whitelisted
          *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract)
-         *      b. for ALL 'dest' = token contracts, and CORRESPONDING 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
-         *         ALL CORRESPONDING func.to must be whitelisted
+         *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+         *         then CORRESPONDING func.to must be whitelisted
          */
         if(userOp.signature.length == 65) {
             address recoveredAddr = _hash.recover(userOp.signature);
@@ -163,55 +163,55 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             }
             console.logBytes4(bytes4(keccak256("execute(address,uint256,bytes)")));
             if(funcSig == bytes4(keccak256("execute(address,uint256,bytes)"))) {
-                address dest;
-                uint256 value;
-                bytes memory func;
-                (dest, value, func) = abi.decode(userOp.callData[4:], (address, uint256, bytes));
+                address dest; uint256 value; bytes memory data;
+                (dest, value, data) = abi.decode(userOp.callData[4:], (address, uint256, bytes));
                 console.log('dest', dest);
                 console.log('value', value);
-                console.logBytes(func);
+                console.logBytes(data);
+                // index range access doesn't work for data as it is in memory
+                // bytes4 internalFuncSig = bytes4(data[:4]);
+                // (to, amount) = abi.decode(data[4:], (address, uint256));
+                // extract first 4 bytes from 'data' without using index range access
+                bytes4 internalFuncSig; address to;
+                assembly {
+                    internalFuncSig := mload(add(data, 32))
+                    to := mload(add(data, 36))
+                }
+                console.logBytes4(internalFuncSig);
+                console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
+                console.log('to', to);
                 if(isWhitelisted[dest]) {
-                    return true;
+                    return _checkWhitelistedTokenInteractions(internalFuncSig, to);
                 }
             }
             console.logBytes4(bytes4(keccak256("executeBatch(address[],bytes[])")));
             if(funcSig == bytes4(keccak256("executeBatch(address[],bytes[])"))) {
                 address[] memory dest;
-                bytes[] memory func;
-                (dest, func) = abi.decode(userOp.callData[4:], (address[], bytes[]));
+                bytes[] memory data;
+                (dest, data) = abi.decode(userOp.callData[4:], (address[], bytes[]));
                 console.log('dest[0]', dest[0]);
                 console.log('dest[2]', dest[2]);
-                console.logBytes(func[0]);
-                console.logBytes(func[2]);
+                console.logBytes(data[0]);
+                console.logBytes(data[2]);
+                bytes4 internalFuncSig; address to;
+                bytes memory dataMem;
                 for(uint256 i = 0; i < dest.length; i++) {
                     if(!isWhitelisted[dest[i]]) {
                         return false;
                     }
+                    dataMem = data[i];
+                    assembly {
+                        internalFuncSig := mload(add(dataMem, 32))
+                        to := mload(add(dataMem, 36))
+                    }
+                    console.logBytes4(internalFuncSig);
+                    console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
+                    console.log('to', to);
+                    if(!_checkWhitelistedTokenInteractions(internalFuncSig, to)) return false;
                 }
                 return true;
             }
-            // if(userOp.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
-            //     magic = bytes4(0);
-            // }
-            // if(magic != bytes4(0)) {
-            //     // extract the first 4 bytes from txn.data and check if its decoded version is 'transfer()', 'safeTransfer()', 'approve()' or 'safeApprove()' and if yes, set magic = bytes4(0)
-            //     // extract address from the next 32 bytes of txn.data and check if it is whitelited or not. If not, set magic = bytes4(0)
-            //     bytes4 functionSelector;
-            //     address to;
-            //     assembly {
-            //         functionSelector := mload(add(txn.data, 0x20))
-            //         to := mload(add(txn.data, 0x40))
-            //     }
-            //     if((functionSelector == bytes4(keccak256("transfer(address,uint256)")) || 
-            //         functionSelector == bytes4(keccak256("safeTransfer(address,uint256)")) || 
-            //         functionSelector == bytes4(keccak256("approve(address,uint256)")) || 
-            //         functionSelector == bytes4(keccak256("safeApprove(address,uint256)"))
-            //         ) && (!isWhitelisted[to])
-            //     ) {
-            //         magic = bytes4(0);
-            //     }
-            // }
-            }
+        }
         // 2/3 multisig
         /** Allowed interations:
          *  1. addDepositTo()
@@ -229,6 +229,23 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             address recoveredAddr2 = _hash.recover(signature2);
 
         }
+    }
+
+    function _checkWhitelistedTokenInteractions(bytes4 _internalFuncSig, address _to) internal view returns (bool) {
+        if(
+            ((_internalFuncSig == bytes4(keccak256("transfer(address,uint256)")) || 
+            _internalFuncSig == bytes4(keccak256("safeTransfer(address,uint256)")) || 
+            _internalFuncSig == bytes4(keccak256("approve(address,uint256)")) || 
+            _internalFuncSig == bytes4(keccak256("safeApprove(address,uint256)")) || 
+            _internalFuncSig == bytes4(keccak256("increaseAllowance(address,uint256)")) || 
+            _internalFuncSig == bytes4(keccak256("safeIncreaseAllowance(address,uint256)")) || 
+            _internalFuncSig == bytes4(keccak256("decreaseAllowance(address,uint256)")) || 
+            _internalFuncSig == bytes4(keccak256("safeDecreaseAllowance(address,uint256)"))
+            ) && (!isWhitelisted[_to]))
+        ) {
+            return false;
+        }
+        return true;
     }
 
     function _call(address target, uint256 value, bytes memory data) internal {
