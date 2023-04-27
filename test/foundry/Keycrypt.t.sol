@@ -5,6 +5,8 @@ import "forge-std/Test.sol";
 import "../../contracts/ETH_Factory.sol";
 import "../../contracts/ETH_Keycrypt.sol";
 
+// import openzeppelin's ERC20 interface
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract KeycryptTest is Test {
     using UserOperationLib for UserOperation;
@@ -59,9 +61,11 @@ contract KeycryptTest is Test {
         // create calldata for addToWhitelist function
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
         // call _createUserOpHash(callData_); and sign the output with owner and guardian1 off-chain
-        sign = _twoOfThreeSign(callData_);
+        sign = _twoOfThreeSign(0, callData_);
 
-        _submitUserOp(callData_, sign);
+        _addUserOp(0, callData_, sign);
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
 
         assertEq(keycrypt.isWhitelisted(addresses[0]), true);
         assertEq(keycrypt.isWhitelisted(addresses[1]), true);
@@ -73,59 +77,92 @@ contract KeycryptTest is Test {
 
         newOwner = vm.addr(22);
         bytes memory callData_ = abi.encodeWithSignature("changeOwner(address)", newOwner);
-        sign = _twoOfThreeSign(callData_);
+        sign = _twoOfThreeSign(0, callData_);
 
-        _submitUserOp(callData_, sign);
+        _addUserOp(0, callData_, sign);
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
 
         assertEq(keycrypt.owner(), newOwner);
     }
 
     function test_addDeposit() public {
         bytes memory callData_ = abi.encodeWithSignature("addDeposit()");
-        sign = _oneOfOneSign(callData_);
+        sign = _oneOfOneSign(0, callData_);
 
-        _submitUserOp(callData_, sign);
+        _addUserOp(0, callData_, sign);
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
 
         // assertEq(keycrypt.owner(), newOwner);
     }
 
     function test_execute() public {
+        // WHITELISTING
+        addresses.push(DAI);
+        addresses.push(guardian1);
         console.log('GUARDIAN1', guardian1);
-        bytes memory callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", DAI, 0, abi.encodeWithSignature("approve(address,uint256)", guardian1, 1e18));
-        sign = _oneOfOneSign(callData_);
+        bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+        sign = _twoOfThreeSign(0, callData_);
+        _addUserOp(0, callData_, sign);
+        //execute whitelisting
+        entryPoint.handleOps(userOp, payable(msg.sender));
 
-        _submitUserOp(callData_, sign);
+        // EXECUTE
+        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", DAI, 0, abi.encodeWithSignature("approve(address,uint256)", guardian1, 1e18));
+        sign = _oneOfOneSign(1, callData_);
+        userOp.pop(); // remove previous op
+        _addUserOp(1, callData_, sign); // note the updated nonce
+        entryPoint.handleOps(userOp, payable(msg.sender));
 
-        // assertEq(keycrypt.owner(), newOwner);
+        assertEq(IERC20(DAI).allowance(address(keycrypt), guardian1), 1e18);
     }
 
     function test_executeBatch() public {
+        // WHITELISTING
         addresses.push(DAI);
         addresses.push(USDC);
         addresses.push(USDT);
+        // add owner, guardian1, guardian2 to addresses
+        addresses.push(owner);
+        addresses.push(guardian1);
+        addresses.push(guardian2);
 
+        bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+        sign = _twoOfThreeSign(0, callData_);
+        _addUserOp(0, callData_, sign);
+        //execute whitelisting
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        // EXECUTE_BATCH
+        // remove owner, guardian1, guardian2 from addresses to send execute() calls to
+        addresses.pop(); addresses.pop(); addresses.pop();
         funcSigs.push(abi.encodeWithSignature("approve(address,uint256)", owner, 1e18));
         funcSigs.push(abi.encodeWithSignature("approve(address,uint256)", guardian1, 1e18));
         funcSigs.push(abi.encodeWithSignature("approve(address,uint256)", guardian2, 1e18));
 
         console.log('OWNER', owner);
-        bytes memory callData_ = abi.encodeWithSignature("executeBatch(address[],bytes[])", addresses, funcSigs);
-        sign = _oneOfOneSign(callData_);
+        callData_ = abi.encodeWithSignature("executeBatch(address[],bytes[])", addresses, funcSigs);
+        sign = _oneOfOneSign(1, callData_);
+        userOp.pop(); // remove previous op // EASILY FORGETTABLE
+        _addUserOp(1, callData_, sign);
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
 
-        _submitUserOp(callData_, sign);
-
-        // assertEq(keycrypt.owner(), newOwner);
+        assertEq(IERC20(DAI).allowance(address(keycrypt), owner), 1e18);
+        assertEq(IERC20(USDC).allowance(address(keycrypt), guardian1), 1e18);
+        assertEq(IERC20(USDT).allowance(address(keycrypt), guardian2), 1e18);
     }
 
-    function _oneOfOneSign(bytes memory _callData) internal view returns (bytes memory _sign){
-        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_callData)));
+    function _oneOfOneSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_nonce, _callData)));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
         _sign = abi.encodePacked(r, s, v);
     }
 
-    function _twoOfThreeSign(bytes memory _callData) internal view returns (bytes memory _sign){
-        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_callData)));
+    function _twoOfThreeSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_nonce, _callData)));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
         bytes memory sign1 = abi.encodePacked(r, s, v);
@@ -135,10 +172,10 @@ contract KeycryptTest is Test {
         _sign = abi.encodePacked(sign1, sign2);
     }
 
-    function _submitUserOp(bytes memory _callData, bytes memory _sign) internal {
+    function _addUserOp(uint256 _nonce, bytes memory _callData, bytes memory _sign) internal {
         userOp.push(UserOperation({
             sender: address(keycrypt),
-            nonce: 0,
+            nonce: _nonce,
             initCode: "",
             callData: _callData,
             callGasLimit: 1000000,
@@ -149,17 +186,14 @@ contract KeycryptTest is Test {
             paymasterAndData: "",
             signature: _sign
         }));
-
-        // simulate the bundler calling handleOps on entryPoint
-        entryPoint.handleOps(userOp, payable(msg.sender));
     }
 
     // to generate the userOpHash along the lines of EntryPoint.getUserOpHash(), 
     // as expected by ETH_Keycrypt.isValidSignature(), which is signed by owner and 1 guardian
-    function _createUserOpHash(bytes memory _callData) internal view returns(bytes32 userOpHash){
+    function _createUserOpHash(uint256 _nonce, bytes memory _callData) internal view returns(bytes32 userOpHash){
         UserOperation memory userOpData = UserOperation({
             sender: address(keycrypt),
-            nonce: 0,
+            nonce: _nonce,
             initCode: "",
             callData: _callData,
             callGasLimit: 1000000,

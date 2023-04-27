@@ -132,14 +132,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         // if (owner != hash.recover(userOp.signature))
         //     return SIG_VALIDATION_FAILED;
         if(isValidSignature(hash, userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE &&
-            _validatePermissions(userOp, hash)) {
+            _validatePermissions(userOp)) {
             return 0;
         } else {
             return SIG_VALIDATION_FAILED;
         }
     }
 
-    function _validatePermissions(UserOperation calldata userOp, bytes32 _hash) internal view returns (bool) {
+    function _validatePermissions(UserOperation calldata userOp) internal view returns (bool) {
         /* 1/1 multisig
          * Allowed interations:
          *  1. addDeposit()
@@ -179,6 +179,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                 console.logBytes4(internalFuncSig);
                 console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
                 console.log('to', to);
+                console.log('isWhitelisted[dest]', isWhitelisted[dest]);
                 if(isWhitelisted[dest]) {
                     return _checkWhitelistedTokenInteractions(internalFuncSig, to);
                 }
@@ -277,6 +278,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                 magic = bytes4(0);
             }
             address recoveredAddr = _hash.recover(_signature);
+            console.log('recoveredAddr', recoveredAddr);
             // Note, that we should abstain from using the require here in order to allow for fee estimation to work
             if(recoveredAddr != owner) {
                 magic = bytes4(0);
