@@ -58,31 +58,10 @@ contract KeycryptTest is Test {
 
         // create calldata for addToWhitelist function
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
-        // call createUserOpHash(callData_); and sign the output with owner and guardian1 off-chain
-        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+        // call _createUserOpHash(callData_); and sign the output with owner and guardian1 off-chain
+        sign = _twoOfThreeSign(callData_);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
-        bytes memory sign1 = abi.encodePacked(r, s, v);
-        (v, r, s) = vm.sign(20, userOpHash);
-        bytes memory sign2 = abi.encodePacked(r, s, v);
-        sign = abi.encodePacked(sign1, sign2);
-        // create UserOperation struct with signature created above and set to 'sign' variable
-        userOp.push(UserOperation({
-            sender: address(keycrypt),
-            nonce: 0,
-            initCode: "",
-            callData: callData_,
-            callGasLimit: 1000000,
-            verificationGasLimit: 1000000,
-            preVerificationGas: 1000000,
-            maxFeePerGas: 43683902336,
-            maxPriorityFeePerGas: 60865874,
-            paymasterAndData: "",
-            signature: sign
-        }));
-
-        // simulate the bundler calling handleOps on entryPoint
-        entryPoint.handleOps(userOp, payable(msg.sender));
+        _submitUserOp(callData_, sign);
 
         assertEq(keycrypt.isWhitelisted(addresses[0]), true);
         assertEq(keycrypt.isWhitelisted(addresses[1]), true);
@@ -94,86 +73,27 @@ contract KeycryptTest is Test {
 
         newOwner = vm.addr(22);
         bytes memory callData_ = abi.encodeWithSignature("changeOwner(address)", newOwner);
-        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+        sign = _twoOfThreeSign(callData_);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
-        bytes memory sign1 = abi.encodePacked(r, s, v);
-        (v, r, s) = vm.sign(20, userOpHash);
-        bytes memory sign2 = abi.encodePacked(r, s, v);
-        sign = abi.encodePacked(sign1, sign2);
-
-        // no need to pop previous userOp[0] as every test starts on a fresh state
-        // userOp.pop();
-        userOp.push(UserOperation({
-            sender: address(keycrypt),
-            nonce: 0,
-            initCode: "",
-            callData: callData_,
-            callGasLimit: 1000000,
-            verificationGasLimit: 1000000,
-            preVerificationGas: 1000000,
-            maxFeePerGas: 43683902336,
-            maxPriorityFeePerGas: 60865874,
-            paymasterAndData: "",
-            signature: sign
-        }));
-
-        // simulate the bundler calling handleOps on entryPoint
-        entryPoint.handleOps(userOp, payable(msg.sender));
+        _submitUserOp(callData_, sign);
 
         assertEq(keycrypt.owner(), newOwner);
     }
 
     function test_addDeposit() public {
         bytes memory callData_ = abi.encodeWithSignature("addDeposit()");
-        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+        sign = _oneOfOneSign(callData_);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
-        sign = abi.encodePacked(r, s, v);
-
-        userOp.push(UserOperation({
-            sender: address(keycrypt),
-            nonce: 0,
-            initCode: "",
-            callData: callData_,
-            callGasLimit: 1000000,
-            verificationGasLimit: 1000000,
-            preVerificationGas: 1000000,
-            maxFeePerGas: 43683902336,
-            maxPriorityFeePerGas: 60865874,
-            paymasterAndData: "",
-            signature: sign
-        }));
-
-        // simulate the bundler calling handleOps on entryPoint
-        entryPoint.handleOps(userOp, payable(msg.sender));
+        _submitUserOp(callData_, sign);
 
         // assertEq(keycrypt.owner(), newOwner);
     }
 
     function test_execute() public {
         bytes memory callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", DAI, 0, abi.encodeWithSignature("approve()", guardian1, 1e18));
-        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+        sign = _oneOfOneSign(callData_);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
-        sign = abi.encodePacked(r, s, v);
-
-        userOp.push(UserOperation({
-            sender: address(keycrypt),
-            nonce: 0,
-            initCode: "",
-            callData: callData_,
-            callGasLimit: 1000000,
-            verificationGasLimit: 1000000,
-            preVerificationGas: 1000000,
-            maxFeePerGas: 43683902336,
-            maxPriorityFeePerGas: 60865874,
-            paymasterAndData: "",
-            signature: sign
-        }));
-
-        // simulate the bundler calling handleOps on entryPoint
-        entryPoint.handleOps(userOp, payable(msg.sender));
+        _submitUserOp(callData_, sign);
 
         // assertEq(keycrypt.owner(), newOwner);
     }
@@ -182,38 +102,59 @@ contract KeycryptTest is Test {
         addresses.push(DAI);
         addresses.push(USDC);
         addresses.push(USDT);
+
         funcSigs.push(abi.encodeWithSignature("approve()", owner, 1e18));
         funcSigs.push(abi.encodeWithSignature("approve()", guardian1, 1e18));
         funcSigs.push(abi.encodeWithSignature("approve()", guardian2, 1e18));
+        
         bytes memory callData_ = abi.encodeWithSignature("executeBatch(address[],bytes[])", addresses, funcSigs);
-        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+        sign = _oneOfOneSign(callData_);
+
+        _submitUserOp(callData_, sign);
+
+        // assertEq(keycrypt.owner(), newOwner);
+    }
+
+    function _oneOfOneSign(bytes memory _callData) internal view returns (bytes memory _sign){
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_callData)));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
-        sign = abi.encodePacked(r, s, v);
+        _sign = abi.encodePacked(r, s, v);
+    }
 
+    function _twoOfThreeSign(bytes memory _callData) internal view returns (bytes memory _sign){
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_callData)));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
+        bytes memory sign1 = abi.encodePacked(r, s, v);
+
+        (v, r, s) = vm.sign(20, userOpHash);
+        bytes memory sign2 = abi.encodePacked(r, s, v);
+        _sign = abi.encodePacked(sign1, sign2);
+    }
+
+    function _submitUserOp(bytes memory _callData, bytes memory _sign) internal {
         userOp.push(UserOperation({
             sender: address(keycrypt),
             nonce: 0,
             initCode: "",
-            callData: callData_,
+            callData: _callData,
             callGasLimit: 1000000,
             verificationGasLimit: 1000000,
             preVerificationGas: 1000000,
             maxFeePerGas: 43683902336,
             maxPriorityFeePerGas: 60865874,
             paymasterAndData: "",
-            signature: sign
+            signature: _sign
         }));
 
         // simulate the bundler calling handleOps on entryPoint
         entryPoint.handleOps(userOp, payable(msg.sender));
-
-        // assertEq(keycrypt.owner(), newOwner);
     }
 
     // to generate the userOpHash along the lines of EntryPoint.getUserOpHash(), 
     // as expected by ETH_Keycrypt.isValidSignature(), which is signed by owner and 1 guardian
-    function createUserOpHash(bytes memory _callData) public view returns(bytes32 userOpHash){
+    function _createUserOpHash(bytes memory _callData) internal view returns(bytes32 userOpHash){
         UserOperation memory userOpData = UserOperation({
             sender: address(keycrypt),
             nonce: 0,
