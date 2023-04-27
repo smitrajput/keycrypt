@@ -139,7 +139,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         }
     }
 
-    function _validatePermissions(UserOperation calldata userOp, bytes32 _hash) internal returns (bool) {
+    function _validatePermissions(UserOperation calldata userOp, bytes32 _hash) internal view returns (bool) {
         // 1/1 multisig
         /** Allowed interations:
          *  1. addDeposit()
@@ -155,42 +155,41 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
             // UserOperation memory userOp = abi.decode(abi.encodePacked(_hash), (UserOperation));
             bytes4 funcSig = bytes4(userOp.callData[:4]);
-            console.log('funcSig, addDeposit');
+            console.log('funcSigReceived, funcSigActual');
             console.logBytes4(funcSig);
             console.logBytes4(bytes4(keccak256("addDeposit()")));
             if(funcSig == bytes4(keccak256("addDeposit()"))) {
                 return true;
             }
+            console.logBytes4(bytes4(keccak256("execute(address,uint256,bytes)")));
             if(funcSig == bytes4(keccak256("execute(address,uint256,bytes)"))) {
                 address dest;
                 uint256 value;
                 bytes memory func;
                 (dest, value, func) = abi.decode(userOp.callData[4:], (address, uint256, bytes));
+                console.log('dest', dest);
+                console.log('value', value);
+                console.logBytes(func);
                 if(isWhitelisted[dest]) {
                     return true;
                 }
             }
-            // if(funcSig == bytes4(keccak256("executeBatch(address[],bytes[])"))) {
-            //     address[] memory dest;
-            //     bytes[] memory func;
-            //     (dest, func) = abi.decode(userOp.callData[4:], (address[], bytes[]));
-            //     bool allWhitelisted = true;
-            //     for(uint256 i = 0; i < dest.length; i++) {
-            //         if(!isWhitelisted[dest[i]]) {
-            //             allWhitelisted = false;
-            //             break;
-            //         }
-            //     }
-            //     if(allWhitelisted) {
-            //         return true;
-            //     }
-            // }
-            // return false;
-       
-            // console.log('userOp.sender');
-            // console.log(userOp.sender);
-            // console.log('userOp.callData');
-            // console.logBytes(userOp.callData);
+            console.logBytes4(bytes4(keccak256("executeBatch(address[],bytes[])")));
+            if(funcSig == bytes4(keccak256("executeBatch(address[],bytes[])"))) {
+                address[] memory dest;
+                bytes[] memory func;
+                (dest, func) = abi.decode(userOp.callData[4:], (address[], bytes[]));
+                console.log('dest[0]', dest[0]);
+                console.log('dest[2]', dest[2]);
+                console.logBytes(func[0]);
+                console.logBytes(func[2]);
+                for(uint256 i = 0; i < dest.length; i++) {
+                    if(!isWhitelisted[dest[i]]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
             // if(userOp.to == uint160(address(this)) || !isWhitelisted[address(uint160(txn.to))]) {
             //     magic = bytes4(0);
             // }

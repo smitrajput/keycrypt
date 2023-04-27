@@ -9,6 +9,10 @@ import "../../contracts/ETH_Keycrypt.sol";
 contract KeycryptTest is Test {
     using UserOperationLib for UserOperation;
 
+    address constant public DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address constant public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant public USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+
     uint256 mainnetFork;
     ETH_Factory public factory;
     ETH_Keycrypt public keycrypt;
@@ -18,6 +22,7 @@ contract KeycryptTest is Test {
     address public guardian2;
     IEntryPoint public entryPoint = IEntryPoint(0x0576a174D229E3cFA37253523E645A78A0C91B57);
     address[] addresses;
+    bytes[] funcSigs;
     UserOperation[] userOp;
     bytes sign;
     Util util;
@@ -42,9 +47,9 @@ contract KeycryptTest is Test {
         console.log('keycrypt address:', address(keycrypt));
 
         // set USDC, USDT, DAI as whitelisted tokens
-        addresses.push(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-        addresses.push(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-        addresses.push(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+        addresses.push(USDC);
+        addresses.push(USDT);
+        addresses.push(DAI);
 
         // check that none of the addresses are whitelisted
         assertFalse(keycrypt.isWhitelisted(addresses[0]));
@@ -121,6 +126,66 @@ contract KeycryptTest is Test {
 
     function test_addDeposit() public {
         bytes memory callData_ = abi.encodeWithSignature("addDeposit()");
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
+        sign = abi.encodePacked(r, s, v);
+
+        userOp.push(UserOperation({
+            sender: address(keycrypt),
+            nonce: 0,
+            initCode: "",
+            callData: callData_,
+            callGasLimit: 1000000,
+            verificationGasLimit: 1000000,
+            preVerificationGas: 1000000,
+            maxFeePerGas: 43683902336,
+            maxPriorityFeePerGas: 60865874,
+            paymasterAndData: "",
+            signature: sign
+        }));
+
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        // assertEq(keycrypt.owner(), newOwner);
+    }
+
+    function test_execute() public {
+        bytes memory callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", DAI, 0, abi.encodeWithSignature("approve()", guardian1, 1e18));
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
+        sign = abi.encodePacked(r, s, v);
+
+        userOp.push(UserOperation({
+            sender: address(keycrypt),
+            nonce: 0,
+            initCode: "",
+            callData: callData_,
+            callGasLimit: 1000000,
+            verificationGasLimit: 1000000,
+            preVerificationGas: 1000000,
+            maxFeePerGas: 43683902336,
+            maxPriorityFeePerGas: 60865874,
+            paymasterAndData: "",
+            signature: sign
+        }));
+
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        // assertEq(keycrypt.owner(), newOwner);
+    }
+
+    function test_executeBatch() public {
+        addresses.push(DAI);
+        addresses.push(USDC);
+        addresses.push(USDT);
+        funcSigs.push(abi.encodeWithSignature("approve()", owner, 1e18));
+        funcSigs.push(abi.encodeWithSignature("approve()", guardian1, 1e18));
+        funcSigs.push(abi.encodeWithSignature("approve()", guardian2, 1e18));
+        bytes memory callData_ = abi.encodeWithSignature("executeBatch(address[],bytes[])", addresses, funcSigs);
         bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", createUserOpHash(callData_)));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
