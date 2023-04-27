@@ -131,8 +131,8 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         bytes32 hash = userOpHash.toEthSignedMessageHash();
         // if (owner != hash.recover(userOp.signature))
         //     return SIG_VALIDATION_FAILED;
-        if(isValidSignature(hash, userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE) {
-            _validatePermissions(userOp, hash);
+        if(isValidSignature(hash, userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE &&
+            _validatePermissions(userOp, hash)) {
             return 0;
         } else {
             return SIG_VALIDATION_FAILED;
@@ -140,18 +140,17 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     }
 
     function _validatePermissions(UserOperation calldata userOp, bytes32 _hash) internal view returns (bool) {
-        // 1/1 multisig
-        /** Allowed interations:
+        /* 1/1 multisig
+         * Allowed interations:
          *  1. addDeposit()
-         *  2. execute() for whitelisted 'dest' (hence also NOT this contract)
+         *  2. execute() for whitelisted 'dest' (hence also NOT this contract unless whitelisted)
          *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
          *         then func.to must be whitelisted
-         *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract)
+         *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract unless whitelisted)
          *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
          *         then CORRESPONDING func.to must be whitelisted
          */
         if(userOp.signature.length == 65) {
-            address recoveredAddr = _hash.recover(userOp.signature);
             // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
             // UserOperation memory userOp = abi.decode(abi.encodePacked(_hash), (UserOperation));
             bytes4 funcSig = bytes4(userOp.callData[:4]);
@@ -212,9 +211,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                 return true;
             }
         }
-        // 2/3 multisig
-        /** Allowed interations:
-         *  1. addDepositTo()
+        /* 2/3 multisig
+         * Allowed interations (basically everything):
+         *  1. addDeposit()
          *  2. execute() for ALL 'dest' (even this contract)
          *  3. executeBatch() for ALL 'dest' (even this contract)
          *  4. changeOwner()
@@ -223,12 +222,10 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
          *  7. withdrawDepositTo()
          */
         else if(userOp.signature.length == 130) {
-
-            (bytes memory signature1, bytes memory signature2) = _extractECDSASignature(userOp.signature);
-            address recoveredAddr1 = _hash.recover(signature1);
-            address recoveredAddr2 = _hash.recover(signature2);
-
+            return true;
         }
+        // for signature length != 65, 130, and garbage ones
+        return false;
     }
 
     function _checkWhitelistedTokenInteractions(bytes4 _internalFuncSig, address _to) internal view returns (bool) {
