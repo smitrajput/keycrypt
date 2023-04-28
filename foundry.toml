@@ -7,6 +7,7 @@ remappings = [
     "@matterlabs/=node_modules/@matterlabs/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "hardhat/=node_modules/hardhat/",
+    "@solady/=lib/solady/"
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
