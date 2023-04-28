@@ -38,11 +38,6 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     event ETH_KeycryptInitialized(IEntryPoint indexed entryPoint, address indexed owner, address guardian1, address guardian2);
     event LogSignatures(bytes indexed signature1, bytes indexed signature2);
 
-    modifier onlyOwner() {
-        _onlyOwner();
-        _;
-    }
-
     constructor(IEntryPoint anEntryPoint) {
         _entryPoint = anEntryPoint;
         _disableInitializers();
@@ -62,14 +57,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
 
     // 2/3 multisig
     function changeOwner(address _newOwner) external {
-        require(msg.sender == address(entryPoint()), "!authorised");
+        require(msg.sender == address(entryPoint()), "!entryPoint");
         owner = _newOwner;
     }
 
     // 2/3 multisig
     // NOTE: don't whitelist THIS contract, or it will be able to call itself
     function addToWhitelist(address[] calldata _addresses) external {
-        require(msg.sender == address(entryPoint()), "!authorised");
+        require(msg.sender == address(entryPoint()), "!entryPoint");
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = true;
         }
@@ -77,7 +72,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
 
     // 2/3 multisig
     function removeFromWhitelist(address[] calldata _addresses) external {
-        require(msg.sender == address(entryPoint()), "!authorised");
+        require(msg.sender == address(entryPoint()), "!entryPoint");
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = false;
         }
@@ -86,8 +81,8 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     /** 1/1 multisig
      * deposit more funds for this account in the entryPoint
      */
-    function addDeposit() public payable {
-        entryPoint().depositTo{value : msg.value}(address(this));
+    function addDeposit(uint256 _amount) public payable {
+        entryPoint().depositTo{value : _amount}(address(this));
     }
 
     /** 2/3 multisig
@@ -95,7 +90,8 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
      * @param withdrawAddress target to send to
      * @param amount to withdraw
      */
-    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
+    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public {
+        require(msg.sender == address(entryPoint()), "!entryPoint");
         entryPoint().withdrawTo(withdrawAddress, amount);
     }
 
@@ -103,7 +99,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
      * execute a transaction (called directly from owner, or by entryPoint)
      */
     function execute(address dest, uint256 value, bytes calldata func) external {
-        _requireFromEntryPointOrOwner();
+        require(msg.sender == address(entryPoint()), "!entryPoint");
         _call(dest, value, func);
     }
 
@@ -111,7 +107,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
      * execute a sequence of transactions
      */
     function executeBatch(address[] calldata dest, bytes[] calldata func) external {
-        _requireFromEntryPointOrOwner();
+        require(msg.sender == address(entryPoint()), "!entryPoint");
         require(dest.length == func.length, "wrong array lengths");
         for (uint256 i = 0; i < dest.length; i++) {
             _call(dest[i], 0, func[i]);
@@ -156,8 +152,8 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             bytes4 funcSig = bytes4(userOp.callData[:4]);
             console.log('funcSigReceived, funcSigActual');
             console.logBytes4(funcSig);
-            console.logBytes4(bytes4(keccak256("addDeposit()")));
-            if(funcSig == bytes4(keccak256("addDeposit()"))) {
+            console.logBytes4(bytes4(keccak256("addDeposit(uint256)")));
+            if(funcSig == bytes4(keccak256("addDeposit(uint256)"))) {
                 return true;
             }
             console.logBytes4(bytes4(keccak256("execute(address,uint256,bytes)")));
@@ -323,19 +319,10 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         return _entryPoint;
     }
 
-    // Require the function call went through EntryPoint or owner
-    function _requireFromEntryPointOrOwner() internal view {
-        require(msg.sender == address(entryPoint()) || msg.sender == owner, "account: not Owner or EntryPoint");
-    }
-
-    function _onlyOwner() internal view {
-        //directly from EOA owner, or through the account itself (which gets redirected through execute())
-        require(msg.sender == owner || msg.sender == address(this), "only owner");
-    }
-
     function _authorizeUpgrade(address newImplementation) internal view override {
         (newImplementation);
-        _onlyOwner();
+        //directly from EOA owner, or through the account itself (which gets redirected through execute())
+        require(msg.sender == owner || msg.sender == address(this), "only owner");
     }
 
     function _extractECDSASignature(

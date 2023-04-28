@@ -72,6 +72,33 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.isWhitelisted(addresses[2]), true);
     }
 
+    function test_removeFromWhitelist() public {
+        // set USDC, USDT, DAI as whitelisted tokens
+        addresses.push(USDC);
+        addresses.push(USDT);
+        addresses.push(DAI);
+
+        bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+        sign = _twoOfThreeSign(0, callData_);
+        _addUserOp(0, callData_, sign);
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        assertTrue(keycrypt.isWhitelisted(addresses[0]));
+        assertTrue(keycrypt.isWhitelisted(addresses[1]));
+        assertTrue(keycrypt.isWhitelisted(addresses[2]));
+
+        // create calldata for removeFromWhitelist function
+        callData_ = abi.encodeWithSignature("removeFromWhitelist(address[])", addresses);
+        sign = _twoOfThreeSign(1, callData_);
+        userOp.pop();
+        _addUserOp(1, callData_, sign);
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        assertEq(keycrypt.isWhitelisted(addresses[0]), false);
+        assertEq(keycrypt.isWhitelisted(addresses[1]), false);
+        assertEq(keycrypt.isWhitelisted(addresses[2]), false);
+    }
+
     function test_changeOwner() public {
         assertEq(keycrypt.owner(), owner);
 
@@ -87,15 +114,43 @@ contract KeycryptTest is Test {
     }
 
     function test_addDeposit() public {
-        bytes memory callData_ = abi.encodeWithSignature("addDeposit()");
+        bytes memory callData_ = abi.encodeWithSignature("addDeposit(uint256)", 0.2 ether);
         sign = _oneOfOneSign(0, callData_);
 
         _addUserOp(0, callData_, sign);
-        // simulate the bundler calling handleOps on entryPoint
+        
+        uint keycryptEthBefore = address(keycrypt).balance;
+        entryPoint.handleOps(userOp, payable(msg.sender));
+        uint keycryptEthAfter = address(keycrypt).balance;
+
+        assertGe(keycryptEthBefore - keycryptEthAfter, 0.2 ether);
+        // deposits in entryPoint must be at least 0.2 ether
+        assertGe(entryPoint.getDepositInfo(address(keycrypt)).deposit, 0.2 ether);
+    }
+
+    function test_withdrawDepositTo() public {
+        // add deposit first
+        bytes memory callData_ = abi.encodeWithSignature("addDeposit(uint256)", 0.2 ether);
+        sign = _oneOfOneSign(0, callData_);
+        _addUserOp(0, callData_, sign);
         entryPoint.handleOps(userOp, payable(msg.sender));
 
-        // assertEq(keycrypt.owner(), newOwner);
+        // withdraw deposit
+        callData_ = abi.encodeWithSignature("withdrawDepositTo(address,uint256)", guardian2, 0.1 ether);
+        sign = _twoOfThreeSign(1, callData_);
+        userOp.pop();
+        _addUserOp(1, callData_, sign);
+        
+        uint depositBefore = entryPoint.getDepositInfo(address(keycrypt)).deposit;
+        uint guardian2EthBefore = guardian2.balance;
+        entryPoint.handleOps(userOp, payable(msg.sender));
+        uint guardian2EthAfter = guardian2.balance;
+        uint depositAfter = entryPoint.getDepositInfo(address(keycrypt)).deposit;
+
+        assertEq(guardian2EthAfter - guardian2EthBefore, 0.1 ether);
+        assertGe(depositBefore - depositAfter, 0.1 ether);
     }
+
 
     function test_execute() public {
         // WHITELISTING
