@@ -8,6 +8,11 @@ import "../../contracts/ETH_Keycrypt.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@solady/src/utils/ERC1967Factory.sol";
 
+interface IUSDC {
+    function configureMinter(address minter, uint256 minterAllowedAmount) external;
+    function mint(address _to, uint256 _amount) external;
+}
+
 contract KeycryptTest is Test {
     using UserOperationLib for UserOperation;
 
@@ -225,6 +230,77 @@ contract KeycryptTest is Test {
         assertEq(IERC20(USDC).allowance(address(keycrypt), guardian1), 1e18);
         assertEq(IERC20(USDT).allowance(address(keycrypt), guardian2), 1e18);
     }
+
+    function test_RevertOn_CallingNonWhitelistedToken() public {
+        // WHITELISTING
+        addresses.push(DAI);
+        addresses.push(guardian1);
+        bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+        sign = _twoOfThreeSign(0, callData_);
+        _addUserOp(0, callData_, sign);
+        //execute whitelisting
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        // EXECUTE
+        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", USDC, 0, abi.encodeWithSignature("approve(address,uint256)", guardian1, 1e18));
+        sign = _oneOfOneSign(1, callData_);
+        userOp.pop(); // remove previous op
+        _addUserOp(1, callData_, sign); // note the updated nonce
+        // vm.expectRevert("invalid signature");
+        // entryPoint.handleOps(userOp, payable(msg.sender));
+        (bool success, ) = address(entryPoint).call(abi.encodeWithSignature("handleOps(bytes[],address)", userOp, payable(msg.sender)));
+        assertEq(success, false);
+    }
+
+    function test_RevertOn_ApprovingNonWhitelistedAddressOnWhitelistedToken() public {
+        // WHITELISTING
+        addresses.push(DAI);
+        addresses.push(guardian1);
+        bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+        sign = _twoOfThreeSign(0, callData_);
+        _addUserOp(0, callData_, sign);
+        //execute whitelisting
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        // EXECUTE
+        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", DAI, 0, abi.encodeWithSignature("approve(address,uint256)", guardian2, 1e18));
+        sign = _oneOfOneSign(1, callData_);
+        userOp.pop(); // remove previous op
+        _addUserOp(1, callData_, sign); // note the updated nonce
+        // vm.expectRevert("invalid signature");
+        // entryPoint.handleOps(userOp, payable(msg.sender));
+        (bool success, ) = address(entryPoint).call(abi.encodeWithSignature("handleOps(bytes[],address)", userOp, payable(msg.sender)));
+        assertEq(success, false);
+    }
+
+    function test_RevertOn_TransferringWhitelistedTokenToNonWhitelistedAddress() public {
+        // WHITELISTING
+        addresses.push(USDC);
+        addresses.push(guardian1);
+        bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+        sign = _twoOfThreeSign(0, callData_);
+        _addUserOp(0, callData_, sign);
+        //execute whitelisting
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        // minting 1000 USDC to keycrypt
+        vm.startPrank(0xE982615d461DD5cD06575BbeA87624fda4e3de17);
+        IUSDC(USDC).configureMinter(0xE982615d461DD5cD06575BbeA87624fda4e3de17, 1000 * 1e6);
+        IUSDC(USDC).mint(address(keycrypt), 1000 * 1e6);
+        vm.stopPrank();
+        console.log('USDC balance', IERC20(USDC).balanceOf(address(keycrypt)));
+
+        // EXECUTE
+        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", USDC, 0, abi.encodeWithSignature("transfer(address,uint256)", guardian2, 100 * 1e6));
+        sign = _oneOfOneSign(1, callData_);
+        userOp.pop(); // remove previous op
+        _addUserOp(1, callData_, sign); // note the updated nonce
+        // vm.expectRevert("invalid signature");
+        // entryPoint.handleOps(userOp, payable(msg.sender));
+        (bool success, ) = address(entryPoint).call(abi.encodeWithSignature("handleOps(bytes[],address)", userOp, payable(msg.sender)));
+        assertEq(success, false);
+    }
+
 
     function _oneOfOneSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
         bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_nonce, _callData)));

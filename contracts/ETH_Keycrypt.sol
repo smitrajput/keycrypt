@@ -56,23 +56,20 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     }
 
     // 2/3 multisig
-    function changeOwner(address _newOwner) external {
-        require(msg.sender == address(entryPoint()), "!entryPoint");
+    function changeOwner(address _newOwner) external onlyEntryPoint {
         owner = _newOwner;
     }
 
     // 2/3 multisig
     // NOTE: don't whitelist THIS contract, or it will be able to call itself
-    function addToWhitelist(address[] calldata _addresses) external {
-        require(msg.sender == address(entryPoint()), "!entryPoint");
+    function addToWhitelist(address[] calldata _addresses) external onlyEntryPoint {
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = true;
         }
     }
 
     // 2/3 multisig
-    function removeFromWhitelist(address[] calldata _addresses) external {
-        require(msg.sender == address(entryPoint()), "!entryPoint");
+    function removeFromWhitelist(address[] calldata _addresses) external onlyEntryPoint {
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = false;
         }
@@ -90,24 +87,21 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
      * @param withdrawAddress target to send to
      * @param amount to withdraw
      */
-    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public {
-        require(msg.sender == address(entryPoint()), "!entryPoint");
+    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyEntryPoint {
         entryPoint().withdrawTo(withdrawAddress, amount);
     }
 
     /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a transaction (called directly from owner, or by entryPoint)
      */
-    function execute(address dest, uint256 value, bytes calldata func) external {
-        require(msg.sender == address(entryPoint()), "!entryPoint");
+    function execute(address dest, uint256 value, bytes calldata func) external onlyEntryPoint {
         _call(dest, value, func);
     }
 
     /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a sequence of transactions
      */
-    function executeBatch(address[] calldata dest, bytes[] calldata func) external {
-        require(msg.sender == address(entryPoint()), "!entryPoint");
+    function executeBatch(address[] calldata dest, bytes[] calldata func) external onlyEntryPoint {
         require(dest.length == func.length, "wrong array lengths");
         for (uint256 i = 0; i < dest.length; i++) {
             _call(dest[i], 0, func[i]);
@@ -115,9 +109,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     }
 
     /// adding access checks in upgradeTo() and upgradeToAndCall() of UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal view override {
-        require(msg.sender == address(entryPoint()), "!entryPoint");
-    }
+    function _authorizeUpgrade(address _newImplementation) internal view override  onlyEntryPoint {}
 
     /// implement template method of ETH_BaseAccount
     function _validateAndUpdateNonce(UserOperation calldata userOp) internal override {
@@ -262,7 +254,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     ) public view override returns (bytes4 magic) {
         magic = EIP1271_SUCCESS_RETURN_VALUE;
 
-        // verify if fee estimation on eth is same as on zkSync
+        // activate this snippet if issues are faced in estimating fees of some signs
         // if (_signature.length != 130) {
         //     // Signature is invalid, but we need to proceed with the signature verification as usual
         //     // in order for the fee estimation to work correctly

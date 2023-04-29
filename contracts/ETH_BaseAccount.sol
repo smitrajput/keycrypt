@@ -21,6 +21,11 @@ abstract contract ETH_BaseAccount is IAccount {
     // equivalent to _packValidationData(true,0,0);
     uint256 constant internal SIG_VALIDATION_FAILED = 1;
 
+    modifier onlyEntryPoint() {
+        require(msg.sender == address(entryPoint()), "!entryPoint");
+        _;
+    }
+
     /**
      * return the account nonce.
      * subclass should return a nonce value that is used both by _validateAndUpdateNonce, and by the external provider (to read the current nonce)
@@ -38,20 +43,12 @@ abstract contract ETH_BaseAccount is IAccount {
      * subclass doesn't need to override this method. Instead, it should override the specific internal validation methods.
      */
     function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 missingAccountFunds)
-    external override virtual returns (uint256 validationData) {
-        _requireFromEntryPoint();
+    external override virtual onlyEntryPoint returns (uint256 validationData) {
         validationData = _validateSignature(userOp, userOpHash);
         if (userOp.initCode.length == 0) {
             _validateAndUpdateNonce(userOp);
         }
         _payPrefund(missingAccountFunds);
-    }
-
-    /**
-     * ensure the request comes from the known entrypoint.
-     */
-    function _requireFromEntryPoint() internal virtual view {
-        require(msg.sender == address(entryPoint()), "account: not from EntryPoint");
     }
 
     /**
