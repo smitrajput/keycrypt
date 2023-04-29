@@ -114,6 +114,11 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         }
     }
 
+    /// adding access checks in upgradeTo() and upgradeToAndCall() of UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal view override {
+        require(msg.sender == address(entryPoint()), "!entryPoint");
+    }
+
     /// implement template method of ETH_BaseAccount
     function _validateAndUpdateNonce(UserOperation calldata userOp) internal override {
         require(_nonce++ == userOp.nonce, "account: invalid nonce");
@@ -302,6 +307,10 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         }
     }
 
+    function currentImplementation() public view returns (address) {
+        return _getImplementation();
+    }
+
     /**
      * check current account deposit in the entryPoint
      */
@@ -317,12 +326,6 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     /// @inheritdoc ETH_BaseAccount
     function entryPoint() public view virtual override returns (IEntryPoint) {
         return _entryPoint;
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal view override {
-        (newImplementation);
-        //directly from EOA owner, or through the account itself (which gets redirected through execute())
-        require(msg.sender == owner || msg.sender == address(this), "only owner");
     }
 
     function _extractECDSASignature(

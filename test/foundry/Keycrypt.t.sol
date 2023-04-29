@@ -18,6 +18,7 @@ contract KeycryptTest is Test {
     uint256 mainnetFork;
     ERC1967Factory public soladyFactory;
     ETH_Keycrypt public keycrypt;
+    ETH_Keycrypt public keycryptImpl;
     address public owner;
     address public newOwner;
     address public guardian1;
@@ -38,7 +39,7 @@ contract KeycryptTest is Test {
         // solady's ERC1967Factory is already deployed at this address
         soladyFactory = ERC1967Factory(0x0000000000006396FF2a80c067f99B3d2Ab4Df24);
         bytes memory data = abi.encodeWithSelector(ETH_Keycrypt.initialize.selector, owner, guardian1, guardian2);
-        ETH_Keycrypt keycryptImpl = new ETH_Keycrypt(entryPoint);
+        keycryptImpl = new ETH_Keycrypt(entryPoint);
         address keycryptAddr = soladyFactory.deployDeterministicAndCall(address(keycryptImpl), owner, 0, data);
         keycrypt = ETH_Keycrypt(payable(keycryptAddr));
         vm.deal(address(keycrypt), 1 ether);
@@ -100,6 +101,19 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.isWhitelisted(addresses[0]), false);
         assertEq(keycrypt.isWhitelisted(addresses[1]), false);
         assertEq(keycrypt.isWhitelisted(addresses[2]), false);
+    }
+
+    function test_upgrade() public {
+        assertEq(keycrypt.currentImplementation(), address(keycryptImpl));
+
+        ETH_Keycrypt keycryptNewImpl = new ETH_Keycrypt(entryPoint);
+        // bytes memory data = abi.encodeWithSelector(ETH_Keycrypt.initialize.selector, guardian2, owner, guardian1);
+        bytes memory callData_ = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", address(keycryptNewImpl), hex"");
+        sign = _twoOfThreeSign(0, callData_);
+        _addUserOp(0, callData_, sign);
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        assertEq(keycrypt.currentImplementation(), address(keycryptNewImpl));
     }
 
     function test_changeOwner() public {
