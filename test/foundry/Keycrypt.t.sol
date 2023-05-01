@@ -135,8 +135,9 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.owner(), newOwner);
     }
 
-    function test_addDeposit() public {
-        bytes memory callData_ = abi.encodeWithSignature("addDeposit(uint256)", 0.2 ether);
+    function test_addDeposit(uint256 _amount) public {
+        vm.assume(_amount <= 0.9 ether);
+        bytes memory callData_ = abi.encodeWithSignature("addDeposit(uint256)", _amount);
         sign = _oneOfOneSign(0, callData_);
 
         _addUserOp(0, callData_, sign);
@@ -145,9 +146,9 @@ contract KeycryptTest is Test {
         entryPoint.handleOps(userOp, payable(msg.sender));
         uint keycryptEthAfter = address(keycrypt).balance;
 
-        assertGe(keycryptEthBefore - keycryptEthAfter, 0.2 ether);
-        // deposits in entryPoint must be at least 0.2 ether
-        assertGe(entryPoint.getDepositInfo(address(keycrypt)).deposit, 0.2 ether);
+        assertGe(keycryptEthBefore - keycryptEthAfter, _amount);
+        // deposits in entryPoint must be at least _amount
+        assertGe(entryPoint.getDepositInfo(address(keycrypt)).deposit, _amount);
     }
 
     function test_withdrawDepositTo() public {
