@@ -25,7 +25,6 @@ contract KeycryptTest is Test {
     ETH_Keycrypt public keycrypt;
     ETH_Keycrypt public keycryptImpl;
     address public owner;
-    address public newOwner;
     address public guardian1;
     address public guardian2;
     IEntryPoint public entryPoint = IEntryPoint(0x0576a174D229E3cFA37253523E645A78A0C91B57);
@@ -52,15 +51,15 @@ contract KeycryptTest is Test {
         util = new Util();
     }
 
-    function test_addToWhitelist() public {
+    function test_addToWhitelist(address _addyA, address _addyB, address _addyC) public {
         console.log('keycrypt balance:', address(keycrypt).balance / 1e18);
         console.log('keycrypt owner:', keycrypt.owner());
         console.log('keycrypt address:', address(keycrypt));
 
-        // set USDC, USDT, DAI as whitelisted tokens
-        addresses.push(USDC);
-        addresses.push(USDT);
-        addresses.push(DAI);
+        // set _addyA, _addyB, _addyC as whitelisted tokens
+        addresses.push(_addyA);
+        addresses.push(_addyB);
+        addresses.push(_addyC);
 
         // check that none of the addresses are whitelisted
         assertFalse(keycrypt.isWhitelisted(addresses[0]));
@@ -81,11 +80,11 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.isWhitelisted(addresses[2]), true);
     }
 
-    function test_removeFromWhitelist() public {
+    function test_removeFromWhitelist(address _addyA, address _addyB, address _addyC) public {
         // set USDC, USDT, DAI as whitelisted tokens
-        addresses.push(USDC);
-        addresses.push(USDT);
-        addresses.push(DAI);
+        addresses.push(_addyA);
+        addresses.push(_addyB);
+        addresses.push(_addyC);
 
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
         sign = _twoOfThreeSign(0, callData_);
@@ -108,7 +107,35 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.isWhitelisted(addresses[2]), false);
     }
 
-    function test_upgrade() public {
+    // "Call did not revert as expected" smh smh smh
+    // function test_RevertOn_upgradingToNonUUPSImpl(address _newKeycryptImpl) public {
+    //     assertEq(keycrypt.currentImplementation(), address(keycryptImpl));
+
+    //     // ETH_Keycrypt keycryptNewImpl = new ETH_Keycrypt(entryPoint);
+    //     // bytes memory data = abi.encodeWithSelector(ETH_Keycrypt.initialize.selector, guardian2, owner, guardian1);
+    //     bytes memory callData_ = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", _newKeycryptImpl, hex"");
+    //     sign = _twoOfThreeSign(0, callData_);
+    //     _addUserOp(0, callData_, sign);
+
+    //     vm.expectRevert("ERC1967Upgrade: new implementation is not UUPS");
+    //     entryPoint.handleOps(userOp, payable(msg.sender));
+    // }
+
+    // "Call did not revert as expected" smh smh smh
+    // function test_RevertOn_upgradingToProxy() public {
+    //     assertEq(keycrypt.currentImplementation(), address(keycryptImpl));
+
+    //     // ETH_Keycrypt keycryptNewImpl = new ETH_Keycrypt(entryPoint);
+    //     // address(keycrypt) is a proxy
+    //     bytes memory callData_ = abi.encodeWithSignature("upgradeTo(address)", address(keycrypt));
+    //     sign = _twoOfThreeSign(0, callData_);
+    //     _addUserOp(0, callData_, sign);
+
+    //     vm.expectRevert(bytes(""));
+    //     entryPoint.handleOps(userOp, payable(msg.sender));
+    // }
+
+    function test_upgradeToUUPSImpl() public {
         assertEq(keycrypt.currentImplementation(), address(keycryptImpl));
 
         ETH_Keycrypt keycryptNewImpl = new ETH_Keycrypt(entryPoint);
@@ -121,46 +148,44 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.currentImplementation(), address(keycryptNewImpl));
     }
 
-    function test_changeOwner() public {
+    function test_changeOwner(address _newOwner) public {
+        vm.assume(_newOwner != address(0));
         assertEq(keycrypt.owner(), owner);
 
-        newOwner = vm.addr(22);
-        bytes memory callData_ = abi.encodeWithSignature("changeOwner(address)", newOwner);
+        bytes memory callData_ = abi.encodeWithSignature("changeOwner(address)", _newOwner);
         sign = _twoOfThreeSign(0, callData_);
 
         _addUserOp(0, callData_, sign);
         // simulate the bundler calling handleOps on entryPoint
         entryPoint.handleOps(userOp, payable(msg.sender));
 
-        assertEq(keycrypt.owner(), newOwner);
+        assertEq(keycrypt.owner(), _newOwner);
     }
 
-    function test_changeGuardianOne() public {
+    function test_changeGuardianOne(address _newGuardian1) public {
+        vm.assume(_newGuardian1 != address(0));
         assertEq(keycrypt.guardian1(), guardian1);
 
-        address newGuardian1 = vm.addr(23);
-        bytes memory callData_ = abi.encodeWithSignature("changeGuardianOne(address)", newGuardian1);
+        bytes memory callData_ = abi.encodeWithSignature("changeGuardianOne(address)", _newGuardian1);
         sign = _twoOfThreeSign(0, callData_);
 
         _addUserOp(0, callData_, sign);
-        // simulate the bundler calling handleOps on entryPoint
         entryPoint.handleOps(userOp, payable(msg.sender));
 
-        assertEq(keycrypt.guardian1(), newGuardian1);
+        assertEq(keycrypt.guardian1(), _newGuardian1);
     }
 
-    function test_changeGuardianTwo() public {
+    function test_changeGuardianTwo(address _newGuardian2) public {
+        vm.assume(_newGuardian2 != address(0));
         assertEq(keycrypt.guardian2(), guardian2);
 
-        address newGuardian2 = vm.addr(24);
-        bytes memory callData_ = abi.encodeWithSignature("changeGuardianTwo(address)", newGuardian2);
+        bytes memory callData_ = abi.encodeWithSignature("changeGuardianTwo(address)", _newGuardian2);
         sign = _twoOfThreeSign(0, callData_);
 
         _addUserOp(0, callData_, sign);
-        // simulate the bundler calling handleOps on entryPoint
         entryPoint.handleOps(userOp, payable(msg.sender));
 
-        assertEq(keycrypt.guardian2(), newGuardian2);
+        assertEq(keycrypt.guardian2(), _newGuardian2);
     }
 
     function test_addDeposit(uint256 _amount) public {

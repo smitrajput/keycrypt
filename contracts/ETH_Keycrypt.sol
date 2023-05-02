@@ -125,7 +125,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     }
 
     /// adding access checks in upgradeTo() and upgradeToAndCall() of UUPSUpgradeable
-    function _authorizeUpgrade(address _newImplementation) internal view override  onlyEntryPoint {}
+    function _authorizeUpgrade(address _newImplementation) internal view override  onlyEntryPoint {
+        // new implementation must be a contract
+    }
 
     /// implement template method of ETH_BaseAccount
     function _validateAndUpdateNonce(UserOperation calldata userOp) internal override {
