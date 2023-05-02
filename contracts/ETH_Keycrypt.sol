@@ -110,17 +110,17 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a transaction (called directly from owner, or by entryPoint)
      */
-    function execute(address dest, uint256 value, bytes calldata func) external onlyEntryPoint {
-        _call(dest, value, func);
+    function execute(address dest, uint256 value, bytes calldata data) external onlyEntryPoint {
+        _call(dest, value, data);
     }
 
     /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a sequence of transactions
      */
-    function executeBatch(address[] calldata dest, bytes[] calldata func) external onlyEntryPoint {
-        require(dest.length == func.length, "wrong array lengths");
+    function executeBatch(address[] calldata dest, bytes[] calldata data) external onlyEntryPoint {
+        require(dest.length == data.length, "wrong array lengths");
         for (uint256 i = 0; i < dest.length; i++) {
-            _call(dest[i], 0, func[i]);
+            _call(dest[i], 0, data[i]);
         }
     }
 
