@@ -135,6 +135,34 @@ contract KeycryptTest is Test {
         assertEq(keycrypt.owner(), newOwner);
     }
 
+    function test_changeGuardianOne() public {
+        assertEq(keycrypt.guardian1(), guardian1);
+
+        address newGuardian1 = vm.addr(23);
+        bytes memory callData_ = abi.encodeWithSignature("changeGuardianOne(address)", newGuardian1);
+        sign = _twoOfThreeSign(0, callData_);
+
+        _addUserOp(0, callData_, sign);
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        assertEq(keycrypt.guardian1(), newGuardian1);
+    }
+
+    function test_changeGuardianTwo() public {
+        assertEq(keycrypt.guardian2(), guardian2);
+
+        address newGuardian2 = vm.addr(24);
+        bytes memory callData_ = abi.encodeWithSignature("changeGuardianTwo(address)", newGuardian2);
+        sign = _twoOfThreeSign(0, callData_);
+
+        _addUserOp(0, callData_, sign);
+        // simulate the bundler calling handleOps on entryPoint
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        assertEq(keycrypt.guardian2(), newGuardian2);
+    }
+
     function test_addDeposit(uint256 _amount) public {
         vm.assume(_amount <= 0.9 ether);
         bytes memory callData_ = abi.encodeWithSignature("addDeposit(uint256)", _amount);

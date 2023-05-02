@@ -57,7 +57,23 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
 
     // 2/3 multisig
     function changeOwner(address _newOwner) external onlyEntryPoint {
+        //require that new owner is not a guardian, current owner, address(0)
+        require(_newOwner != address(0) && _newOwner != guardian1 && _newOwner != guardian2 && _newOwner != owner, "invalid new owner");
         owner = _newOwner;
+    }
+
+    // 2/3 multisig
+    function changeGuardianOne(address _newGuardian1) external onlyEntryPoint {
+        //require that new guardian1 is not a guardian, current owner, address(0)
+        require(_newGuardian1 != address(0) && _newGuardian1 != guardian1 && _newGuardian1 != guardian2 && _newGuardian1 != owner, "invalid new guardian1");
+        guardian1 = _newGuardian1;
+    }
+
+    // 2/3 multisig
+    function changeGuardianTwo(address _newGuardian2) external onlyEntryPoint {
+        //require that new guardian2 is not a guardian, current owner, address(0)
+        require(_newGuardian2 != address(0) && _newGuardian2 != guardian1 && _newGuardian2 != guardian2 && _newGuardian2 != owner, "invalid new guardian2");
+        guardian2 = _newGuardian2;
     }
 
     // 2/3 multisig
@@ -214,6 +230,8 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
          *  5. addToWhitelist()
          *  6. removeFromWhitelist()
          *  7. withdrawDepositTo()
+         *  8. changeGuardianOne()
+         *  9. changeGuardianTwo()
          */
         else if(userOp.signature.length == 130) {
             return true;
