@@ -165,9 +165,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
             // UserOperation memory userOp = abi.decode(abi.encodePacked(_hash), (UserOperation));
             bytes4 funcSig = bytes4(userOp.callData[:4]);
-            console.log('funcSigReceived, funcSigActual');
-            console.logBytes4(funcSig);
-            console.logBytes4(bytes4(keccak256("addDeposit(uint256)")));
+            // console.log('funcSigReceived, funcSigActual');
+            // console.logBytes4(funcSig);
+            // console.logBytes4(bytes4(keccak256("addDeposit(uint256)")));
             if(funcSig == bytes4(keccak256("addDeposit(uint256)"))) {
                 return true;
             }
@@ -175,9 +175,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             if(funcSig == bytes4(keccak256("execute(address,uint256,bytes)"))) {
                 address dest; uint256 value; bytes memory data;
                 (dest, value, data) = abi.decode(userOp.callData[4:], (address, uint256, bytes));
-                console.log('dest', dest);
-                console.log('value', value);
-                console.logBytes(data);
+                // console.log('dest', dest);
+                // console.log('value', value);
+                // console.logBytes(data);
                 // index range access doesn't work for data as it is in memory
                 // bytes4 internalFuncSig = bytes4(data[:4]);
                 // (to, amount) = abi.decode(data[4:], (address, uint256));
@@ -187,10 +187,10 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                     internalFuncSig := mload(add(data, 32))
                     to := mload(add(data, 36))
                 }
-                console.logBytes4(internalFuncSig);
-                console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
-                console.log('to', to);
-                console.log('isWhitelisted[dest]', isWhitelisted[dest]);
+                // console.logBytes4(internalFuncSig);
+                // console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
+                // console.log('to', to);
+                // console.log('isWhitelisted[dest]', isWhitelisted[dest]);
                 if(isWhitelisted[dest]) {
                     return _checkWhitelistedTokenInteractions(internalFuncSig, to);
                 }
@@ -200,10 +200,10 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                 address[] memory dest;
                 bytes[] memory data;
                 (dest, data) = abi.decode(userOp.callData[4:], (address[], bytes[]));
-                console.log('dest[0]', dest[0]);
-                console.log('dest[2]', dest[2]);
-                console.logBytes(data[0]);
-                console.logBytes(data[2]);
+                // console.log('dest[0]', dest[0]);
+                // console.log('dest[2]', dest[2]);
+                // console.logBytes(data[0]);
+                // console.logBytes(data[2]);
                 bytes4 internalFuncSig; address to;
                 bytes memory dataMem;
                 for(uint256 i = 0; i < dest.length; i++) {
@@ -215,9 +215,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                         internalFuncSig := mload(add(dataMem, 32))
                         to := mload(add(dataMem, 36))
                     }
-                    console.logBytes4(internalFuncSig);
-                    console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
-                    console.log('to', to);
+                    // console.logBytes4(internalFuncSig);
+                    // console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
+                    // console.log('to', to);
                     if(!_checkWhitelistedTokenInteractions(internalFuncSig, to)) return false;
                 }
                 return true;
