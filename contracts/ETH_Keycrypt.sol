@@ -48,7 +48,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
      * a new implementation of ETH_Keycrypt must be deployed with the new EntryPoint address, then upgrading
       * the implementation by calling `upgradeTo()`
      */
-    function initialize(address _owner, address _guardian1, address _guardian2) public virtual initializer {
+    function initialize(address _owner, address _guardian1, address _guardian2) public onlyProxy virtual initializer {
         owner = _owner;
         guardian1 = _guardian1;
         guardian2 = _guardian2;
@@ -56,21 +56,21 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     }
 
     // 2/3 multisig
-    function changeOwner(address _newOwner) external onlyEntryPoint {
+    function changeOwner(address _newOwner) external onlyProxy onlyEntryPoint {
         //require that new owner is not a guardian, current owner, address(0)
         require(_newOwner != address(0) && _newOwner != guardian1 && _newOwner != guardian2 && _newOwner != owner, "invalid new owner");
         owner = _newOwner;
     }
 
     // 2/3 multisig
-    function changeGuardianOne(address _newGuardian1) external onlyEntryPoint {
+    function changeGuardianOne(address _newGuardian1) external onlyProxy onlyEntryPoint {
         //require that new guardian1 is not a guardian, current owner, address(0)
         require(_newGuardian1 != address(0) && _newGuardian1 != guardian1 && _newGuardian1 != guardian2 && _newGuardian1 != owner, "invalid new guardian1");
         guardian1 = _newGuardian1;
     }
 
     // 2/3 multisig
-    function changeGuardianTwo(address _newGuardian2) external onlyEntryPoint {
+    function changeGuardianTwo(address _newGuardian2) external onlyProxy onlyEntryPoint {
         //require that new guardian2 is not a guardian, current owner, address(0)
         require(_newGuardian2 != address(0) && _newGuardian2 != guardian1 && _newGuardian2 != guardian2 && _newGuardian2 != owner, "invalid new guardian2");
         guardian2 = _newGuardian2;
@@ -78,14 +78,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
 
     // 2/3 multisig
     // NOTE: don't whitelist THIS contract, or it will be able to call itself
-    function addToWhitelist(address[] calldata _addresses) external onlyEntryPoint {
+    function addToWhitelist(address[] calldata _addresses) external onlyProxy onlyEntryPoint {
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = true;
         }
     }
 
     // 2/3 multisig
-    function removeFromWhitelist(address[] calldata _addresses) external onlyEntryPoint {
+    function removeFromWhitelist(address[] calldata _addresses) external onlyProxy onlyEntryPoint {
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = false;
         }
@@ -94,7 +94,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     /** 1/1 multisig
      * deposit more funds for this account in the entryPoint
      */
-    function addDeposit(uint256 _amount) public payable {
+    function addDeposit(uint256 _amount) external onlyProxy payable {
         entryPoint().depositTo{value : _amount}(address(this));
     }
 
@@ -103,21 +103,21 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
      * @param withdrawAddress target to send to
      * @param amount to withdraw
      */
-    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) public onlyEntryPoint {
+    function withdrawDepositTo(address payable withdrawAddress, uint256 amount) external onlyProxy onlyEntryPoint {
         entryPoint().withdrawTo(withdrawAddress, amount);
     }
 
     /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a transaction (called directly from owner, or by entryPoint)
      */
-    function execute(address dest, uint256 value, bytes calldata data) external onlyEntryPoint {
+    function execute(address dest, uint256 value, bytes calldata data) external onlyProxy onlyEntryPoint {
         _call(dest, value, data);
     }
 
     /** 1/1 multisig for whitelisted txns and 2/3 for non-whitelisted ones
      * execute a sequence of transactions
      */
-    function executeBatch(address[] calldata dest, bytes[] calldata data) external onlyEntryPoint {
+    function executeBatch(address[] calldata dest, bytes[] calldata data) external onlyProxy onlyEntryPoint {
         require(dest.length == data.length, "wrong array lengths");
         for (uint256 i = 0; i < dest.length; i++) {
             _call(dest[i], 0, data[i]);
@@ -125,7 +125,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     }
 
     /// adding access checks in upgradeTo() and upgradeToAndCall() of UUPSUpgradeable
-    function _authorizeUpgrade(address _newImplementation) internal view override  onlyEntryPoint {
+    function _authorizeUpgrade(address _newImplementation) internal view override onlyEntryPoint {
         // new implementation must be a contract
     }
 
@@ -152,14 +152,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
 
     function _validatePermissions(UserOperation calldata userOp) internal view returns (bool) {
         /* 1/1 multisig
-         * Allowed interations:
-         *  1. addDeposit()
-         *  2. execute() for whitelisted 'dest' (hence also NOT this contract unless whitelisted)
-         *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
-         *         then func.to must be whitelisted
-         *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract unless whitelisted)
-         *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
-         *         then CORRESPONDING func.to must be whitelisted
+        * Allowed interations:
+        *  1. addDeposit()
+        *  2. execute() for whitelisted 'dest' (hence also NOT this contract unless whitelisted)
+        *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+        *         then func.to must be whitelisted
+        *  3. executeBatch() for whitelisted 'dest' (hence also NOT this contract unless whitelisted)
+        *      a. if 'func' = transfer(), safeTransfer(), approve(), safeApprove(), increaseAllowance(), decreaseAllowance(),
+        *         then CORRESPONDING func.to must be whitelisted
          */
         if(userOp.signature.length == 65) {
             // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
@@ -225,15 +225,15 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         }
         /* 2/3 multisig
          * Allowed interations (basically everything):
-         *  1. addDeposit()
-         *  2. execute() for ALL 'dest' (even this contract)
-         *  3. executeBatch() for ALL 'dest' (even this contract)
-         *  4. changeOwner()
-         *  5. addToWhitelist()
-         *  6. removeFromWhitelist()
-         *  7. withdrawDepositTo()
-         *  8. changeGuardianOne()
-         *  9. changeGuardianTwo()
+        *  1. addDeposit()
+        *  2. execute() for ALL 'dest' (even this contract)
+        *  3. executeBatch() for ALL 'dest' (even this contract)
+        *  4. changeOwner()
+        *  5. addToWhitelist()
+        *  6. removeFromWhitelist()
+        *  7. withdrawDepositTo()
+        *  8. changeGuardianOne()
+        *  9. changeGuardianTwo()
          */
         else if(userOp.signature.length == 130) {
             return true;
@@ -305,15 +305,19 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             address recoveredAddr2 = _hash.recover(signature2);
 
             // Note, that we should abstain from using the require here in order to allow for fee estimation to work
-            // recoveredAddr1 and recoveredAddr2 both need to be either owner or guardian1 or guardian2,
-            // to ensure 2/3 multisig
-            if(recoveredAddr1 != owner && recoveredAddr1 != guardian1 && recoveredAddr1 != guardian2) {
+            // Either of the recovered addresses should be owner and the other address should be either guardian1 or guardian2
+            if(recoveredAddr1 == owner) {
+                if(recoveredAddr2 != guardian1 && recoveredAddr2 != guardian2) {
+                    magic = bytes4(0);
+                }
+            } else if(recoveredAddr2 == owner) {
+                if(recoveredAddr1 != guardian1 && recoveredAddr1 != guardian2) {
+                    magic = bytes4(0);
+                }
+            } else {
                 magic = bytes4(0);
-            } else if(recoveredAddr2 != owner && recoveredAddr2 != guardian1 && recoveredAddr2 != guardian2) {
-                magic = bytes4(0);
-            } else if(recoveredAddr1 == recoveredAddr2) {
-                magic = bytes4(0);
-            } 
+            }
+
         } else {
             magic = bytes4(0);
         }
