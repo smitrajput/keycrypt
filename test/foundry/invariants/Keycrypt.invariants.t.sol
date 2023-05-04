@@ -40,3 +40,59 @@
  *    changeGuardianOne(), changeGuardianTwo(), validateUserOp() returns 0
  * 7. For the wallet owning 1m ETH and 1B USDC, if (5) and (6) are false (at any of the 3 layers of permissions), then wallet balance stays the same.
 */
+pragma solidity ^0.8.13;
+
+import "forge-std/Test.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@solady/src/utils/ERC1967Factory.sol";
+import "../../../contracts/ETH_Keycrypt.sol";
+import "./handlers/Handler.sol";
+
+contract KeycryptInvariants is Test {
+    using UserOperationLib for UserOperation;
+
+    address constant public DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address constant public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant public USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+
+    uint256 mainnetFork;
+    ERC1967Factory public soladyFactory;
+    ETH_Keycrypt public keycrypt;
+    ETH_Keycrypt public keycryptImpl;
+    Handler public handler;
+    address public owner;
+    address public guardian1;
+    address public guardian2;
+    IEntryPoint public entryPoint = IEntryPoint(0x0576a174D229E3cFA37253523E645A78A0C91B57);
+    address[] addresses;
+    bytes[] funcSigs;
+    UserOperation[] userOp;
+    bytes sign;
+    // Util util;
+
+    function setUp() public {
+        mainnetFork = vm.createFork('https://eth-mainnet.g.alchemy.com/v2/BKt4FdcCBCJR7b5-KAdqNfoovPA7rFcx');
+        vm.selectFork(mainnetFork);
+        owner = vm.addr(19);
+        guardian1 = vm.addr(20);
+        guardian2 = vm.addr(21);
+        soladyFactory = ERC1967Factory(0x0000000000006396FF2a80c067f99B3d2Ab4Df24);
+        bytes memory data = abi.encodeWithSelector(ETH_Keycrypt.initialize.selector, owner, guardian1, guardian2);
+        keycryptImpl = new ETH_Keycrypt(entryPoint);
+        address keycryptAddr = soladyFactory.deployDeterministicAndCall(address(keycryptImpl), owner, 0, data);
+        keycrypt = ETH_Keycrypt(payable(keycryptAddr));
+        handler = new Handler(keycrypt);
+        vm.deal(address(keycrypt), 100 ether);
+        // util = new Util();
+
+        targetContract(address(handler));
+    }
+
+    // ETH can only be wrapped into WETH, WETH can only
+    // be unwrapped back into ETH. The sum of the Handler's
+    // ETH balance plus the WETH totalSupply() should always
+    // equal the total ETH_SUPPLY.
+    // function invariant_conservationOfETH() public {
+    //     assertEq(ETH_SUPPLY, address(handler).balance + weth.totalSupply());
+    // }
+}
