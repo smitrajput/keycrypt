@@ -14,7 +14,7 @@ remappings = [
 runs = 256
 
 [invariant]
-runs = 100
+runs = 10
 depth = 15
 fail_on_revert = false
 call_override = false

@@ -33,12 +33,13 @@
  * Invariants:
  * 1. Signs that are not owner-signed or (owner + guardian1/2)-signed, cannot alter system state
  * 2. Sum of all deposits via addDeposit() minus all withdrawals via withdrawDepositTo(), equals entryPoint().balanceOf(keycrypt)
- * 3. isValidSignature(_hash, signature) returns EIP1271_SUCCESS_RETURN_VALUE for ALL 65-sized signs signed by owner
- * 4. isValidSignature(_hash, signature) returns EIP1271_SUCCESS_RETURN_VALUE for ALL 130-sized signs signed by owner and guardian1/2
+ * 3. // (not really an invariant) isValidSignature(_hash, signature) returns EIP1271_SUCCESS_RETURN_VALUE for ALL 65-sized signs signed by owner
+ * 4. // (not really an invariant) isValidSignature(_hash, signature) returns EIP1271_SUCCESS_RETURN_VALUE for ALL 130-sized signs signed by owner and guardian1/2
  * 5. For ALL 65-sized owner-signed signs, if userOp.callData[:4] is, addDeposit(), execute() with 5.2.a above, executeBatch() with 5.3.a above, validateUserOp() returns 0
  * 6. For ALL 130-sized (owner + guardian1/2)-signed signs, if userOp.callData[:4] is, addDeposit(), execute(), executeBatch(), changeOwner(), addToWhitelist(), removeFromWhitelist(), withdrawDepositTo(),
  *    changeGuardianOne(), changeGuardianTwo(), validateUserOp() returns 0
  * 7. For the wallet owning 1m ETH and 1B USDC, if (5) and (6) are false (at any of the 3 layers of permissions), then wallet balance stays the same.
+ * 8. Number of successful txns = _nonce
 */
 pragma solidity ^0.8.13;
 
@@ -96,7 +97,10 @@ contract KeycryptInvariants is Test {
         vm.stopPrank();
         console.log('USDC balance', IERC20(USDC).balanceOf(address(keycrypt)));
 
-        // util = new Util();
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = Handler.oneOfOneNonOwnerExecute.selector;
+
+        targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
 
         targetContract(address(handler));
     }

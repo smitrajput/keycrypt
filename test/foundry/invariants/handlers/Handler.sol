@@ -23,25 +23,22 @@ contract Handler is Test {
 
     constructor(ETH_Keycrypt _keycrypt) {
         keycrypt = _keycrypt;
+        util = new Util();
     }
 
-    function oneOfOneNonOwnerExecute() public {
+    function oneOfOneNonOwnerExecute(uint256 _pk) public {
         addresses.push(USDC);
         addresses.push(keycrypt.guardian1());
-        console.log('GUARDIAN1', keycrypt.guardian1());
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
-        sign = _twoOfThreeSign(0, callData_);
+        sign = _twoOfThreeAuthSign(0, callData_);
         _addUserOp(0, callData_, sign);
-        //execute whitelisting
         entryPoint.handleOps(userOp, payable(msg.sender));
 
-        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", USDC, 0, abi.encodeWithSignature("approve(address,uint256)", address(this), 1e15));
-        sign = _oneOfOneNonOwnerSign(1, callData_);
+        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", USDC, 0, abi.encodeWithSignature("transfer(address,uint256)", address(this), 1e15));
+        sign = _oneOfOneNonOwnerSign(_pk, 1, callData_);
         userOp.pop(); // remove previous op
         _addUserOp(1, callData_, sign); // note the updated nonce
         entryPoint.handleOps(userOp, payable(msg.sender));
-
-        // assertEq(IERC20(USDC).allowance(address(keycrypt), keycrypt.guardian1()), 1e18);
     }
 
     function _oneOfOneOwnerSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
@@ -51,21 +48,37 @@ contract Handler is Test {
         _sign = abi.encodePacked(r, s, v);
     }
 
-    function _oneOfOneNonOwnerSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
+    function _oneOfOneNonOwnerSign(uint256 _pk, uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
         bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_nonce, _callData)));
 
         // owner's private key is 19
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(22, userOpHash);
+        vm.assume(_pk != 19);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk, userOpHash);
         _sign = abi.encodePacked(r, s, v);
     }
 
-    function _twoOfThreeSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
+    function _twoOfThreeAuthSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
         bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_nonce, _callData)));
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(19, userOpHash);
         bytes memory sign1 = abi.encodePacked(r, s, v);
 
         (v, r, s) = vm.sign(20, userOpHash);
+        bytes memory sign2 = abi.encodePacked(r, s, v);
+        _sign = abi.encodePacked(sign1, sign2);
+    }
+
+    function _twoOfThreeNonAuthSign(uint256 _pk1, uint256 _pk2, uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){
+        bytes32 userOpHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _createUserOpHash(_nonce, _callData)));
+
+        // owner's private key is 19
+        // we can be more pecky by allowing one of _pk1 or _pk2 to be 19, and assume the other is none of guardians' private key, if time allows
+        vm.assume(_pk1 != 19 && _pk2 != 19);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_pk1, userOpHash);
+        bytes memory sign1 = abi.encodePacked(r, s, v);
+
+        (v, r, s) = vm.sign(_pk2, userOpHash);
         bytes memory sign2 = abi.encodePacked(r, s, v);
         _sign = abi.encodePacked(sign1, sign2);
     }
@@ -86,8 +99,6 @@ contract Handler is Test {
         }));
     }
 
-    // to generate the userOpHash along the lines of EntryPoint.getUserOpHash(), 
-    // as expected by ETH_Keycrypt.isValidSignature(), which is signed by owner and 1 guardian
     function _createUserOpHash(uint256 _nonce, bytes memory _callData) internal view returns(bytes32 userOpHash){
         UserOperation memory userOpData = UserOperation({
             sender: address(keycrypt),
