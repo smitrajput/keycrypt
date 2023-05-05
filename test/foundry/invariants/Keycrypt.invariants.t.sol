@@ -48,6 +48,11 @@ import "@solady/src/utils/ERC1967Factory.sol";
 import "../../../contracts/ETH_Keycrypt.sol";
 import "./handlers/Handler.sol";
 
+interface IUSDC {
+    function configureMinter(address minter, uint256 minterAllowedAmount) external;
+    function mint(address _to, uint256 _amount) external;
+}
+
 contract KeycryptInvariants is Test {
     using UserOperationLib for UserOperation;
 
@@ -82,17 +87,22 @@ contract KeycryptInvariants is Test {
         address keycryptAddr = soladyFactory.deployDeterministicAndCall(address(keycryptImpl), owner, 0, data);
         keycrypt = ETH_Keycrypt(payable(keycryptAddr));
         handler = new Handler(keycrypt);
-        vm.deal(address(keycrypt), 100 ether);
+
+        // minting 1m ETH and 1B USDC to create a system state
+        vm.deal(address(keycrypt), 1_000_000 ether);
+        vm.startPrank(0xE982615d461DD5cD06575BbeA87624fda4e3de17);
+        IUSDC(USDC).configureMinter(0xE982615d461DD5cD06575BbeA87624fda4e3de17, 1_000_000_000 * 1e6);
+        IUSDC(USDC).mint(address(keycrypt), 1_000_000_000 * 1e6);
+        vm.stopPrank();
+        console.log('USDC balance', IERC20(USDC).balanceOf(address(keycrypt)));
+
         // util = new Util();
 
         targetContract(address(handler));
     }
 
-    // ETH can only be wrapped into WETH, WETH can only
-    // be unwrapped back into ETH. The sum of the Handler's
-    // ETH balance plus the WETH totalSupply() should always
-    // equal the total ETH_SUPPLY.
-    // function invariant_conservationOfETH() public {
-    //     assertEq(ETH_SUPPLY, address(handler).balance + weth.totalSupply());
-    // }
+    function invariant_unchangedTokenBalance() public {
+        assertEq(address(keycrypt).balance, 1_000_000 ether);
+        assert(IERC20(USDC).balanceOf(address(keycrypt)) == 1_000_000_000 * 1e6);
+    }
 }

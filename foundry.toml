@@ -13,4 +13,13 @@ remappings = [
 [fuzz]
 runs = 256
 
+[invariant]
+runs = 100
+depth = 15
+fail_on_revert = false
+call_override = false
+dictionary_weight = 80
+include_storage = true
+include_push_bytes = true
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
