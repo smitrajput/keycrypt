@@ -1,0 +1,17 @@
+diff --git a/contracts/ETH_Keycrypt.sol b/contracts/ETH_Keycrypt.sol
+index 432c47b..c438182 100644
+--- a/contracts/ETH_Keycrypt.sol
++++ b/contracts/ETH_Keycrypt.sol
+@@ -293,9 +293,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
+             address recoveredAddr = _hash.recover(_signature);
+             console.log('recoveredAddr', recoveredAddr);
+             // Note, that we should abstain from using the require here in order to allow for fee estimation to work
+-            if(recoveredAddr != owner) {
+-                magic = bytes4(0);
+-            }
++            // if(recoveredAddr != owner) {
++            //     magic = bytes4(0);
++            // }
+         } else if(_signature.length == 130) {
+             (bytes memory signature1, bytes memory signature2) = _extractECDSASignature(_signature);
+             if(!_checkValidECDSASignatureFormat(signature1) || !_checkValidECDSASignatureFormat(signature2)) {

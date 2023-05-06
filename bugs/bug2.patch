@@ -1,0 +1,13 @@
+diff --git a/contracts/ETH_Keycrypt.sol b/contracts/ETH_Keycrypt.sol
+index 432c47b..91bd48a 100644
+--- a/contracts/ETH_Keycrypt.sol
++++ b/contracts/ETH_Keycrypt.sol
+@@ -315,7 +315,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
+                     magic = bytes4(0);
+                 }
+             } else {
+-                magic = bytes4(0);
++                // magic = bytes4(0);
+             }
+ 
+         } else {
