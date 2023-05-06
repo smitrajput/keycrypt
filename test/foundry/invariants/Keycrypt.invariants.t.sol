@@ -110,8 +110,11 @@ contract KeycryptInvariants is Test {
         targetContract(address(handler));
     }
 
-    function invariant_unchangedTokenBalance() public {
+    function invariant_unchangedETHBalance() public {
         assertEq(address(keycrypt).balance, 1_000_000 ether);
+    }
+
+    function invariant_unchangedUSDCBalance() public view {
         assert(IERC20(USDC).balanceOf(address(keycrypt)) == 1_000_000_000 * 1e6);
     }
 
