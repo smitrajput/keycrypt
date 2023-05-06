@@ -1,0 +1,13 @@
+diff --git a/contracts/ETH_Keycrypt.sol b/contracts/ETH_Keycrypt.sol
+index 432c47b..1043400 100644
+--- a/contracts/ETH_Keycrypt.sol
++++ b/contracts/ETH_Keycrypt.sol
+@@ -252,7 +252,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
+             _internalFuncSig == bytes4(keccak256("safeIncreaseAllowance(address,uint256)")) || 
+             _internalFuncSig == bytes4(keccak256("decreaseAllowance(address,uint256)")) || 
+             _internalFuncSig == bytes4(keccak256("safeDecreaseAllowance(address,uint256)"))
+-            ) && (!isWhitelisted[_to]))
++            ) /* && (!isWhitelisted[_to]) */)
+         ) {
+             return false;
+         }
