@@ -138,6 +138,9 @@ contract Handler is Test {
         ++ghost_Nonce;
     }
 
+    /// TODO: expose executeBatch(), add/withdrawDeposit(), addTo/removeFromWhitelist(). These were postponed due to lack of relevancy
+    /// TODO: check why callSummary() is not printing logs
+
     function _targetTokenFunc(uint256 _funcSeed, uint256 _pk) internal pure returns (bytes memory) {
         string[] memory funcSig = new string[](8);
         funcSig[0] = "transfer(address,uint256)";
