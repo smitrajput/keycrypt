@@ -4,7 +4,10 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "../../../../contracts/ETH_Keycrypt.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/// @dev different values of '_pk' signing txns below, simulate different actors calling keycrypt via entryPoint and not the handler
+/// this is why we don't need to vm.prank(msg.sender) before making a call to keycrypt
 contract Handler is Test {
 
     address constant public DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
@@ -21,24 +24,150 @@ contract Handler is Test {
     bytes sign;
     Util util;
 
+    /// @dev ghost variable that updates by 1 for every successful call to keycrypt
+    uint256 public ghost_Nonce;
+    mapping(bytes32 => uint256) public calls;
+
+    modifier countCall(bytes32 key) {
+        calls[key]++;
+        _;
+    }
+
     constructor(ETH_Keycrypt _keycrypt) {
         keycrypt = _keycrypt;
         util = new Util();
     }
 
-    function oneOfOneNonOwnerExecute(uint256 _pk) public {
+    /// @dev to summarise the number of calls made to each of the functions below
+    function callSummary() public view {
+        console.log("Call summary:");
+        console.log("-------------------");
+        console.log("oneOfOneNonOwnerExecute", calls["oneOfOneNonOwnerExecute"]);
+        console.log("oneOfOneOwnerExecute", calls["oneOfOneOwnerExecute"]);
+        console.log("twoOfThreeNonAuthChangeOG1G2", calls["twoOfThreeNonAuthChangeOG1G2"]);
+        console.log("twoOfThreeNonAuthUpgrade", calls["twoOfThreeNonAuthUpgrade"]);
+    }
+
+    /// @dev function exposed: execute(), with all target functions in _targetTokenFunc()
+    /// _pk simulates attacker's private key
+    /// actual test here is non-owner trying to execute()
+    function oneOfOneNonOwnerExecute(uint256 _pk, uint256 _funcSeed) public countCall("oneOfOneNonOwnerExecute") {
         addresses.push(USDC);
-        addresses.push(keycrypt.guardian1());
+        // even if attacker's address is whitelisted smh
+        addresses.push(vm.addr(_pk));
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
-        sign = _twoOfThreeAuthSign(0, callData_);
-        _addUserOp(0, callData_, sign);
+        sign = _twoOfThreeAuthSign(keycrypt.nonce(), callData_);
+        _addUserOp(keycrypt.nonce(), callData_, sign);
         entryPoint.handleOps(userOp, payable(msg.sender));
 
-        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", USDC, 0, abi.encodeWithSignature("transfer(address,uint256)", address(this), 1e15));
-        sign = _oneOfOneNonOwnerSign(_pk, 1, callData_);
+        ++ghost_Nonce;
+
+        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", USDC, 0, _targetTokenFunc(_funcSeed, _pk));
+        sign = _oneOfOneNonOwnerSign(_pk, keycrypt.nonce(), callData_);
         userOp.pop(); // remove previous op
-        _addUserOp(1, callData_, sign); // note the updated nonce
+        _addUserOp(keycrypt.nonce(), callData_, sign); // note the updated nonce
         entryPoint.handleOps(userOp, payable(msg.sender));
+        
+        if(_funcSeed == 2) {
+            IERC20(USDC).transferFrom(address(keycrypt), vm.addr(_pk), 1e15);
+        } 
+        // else if(_funcSeed == 3) {
+        //     SafeERC20(USDC).safeTransferFrom(address(keycrypt), vm.addr(_pk), 1e15);
+        // }
+
+        // execution reaching here means the calls to keycrypt were successful
+        ++ghost_Nonce;
+    }
+
+    /// @dev function exposed: execute(), with all target functions in _targetTokenFunc()
+    /// simulating the scenario when _pk gains access to the owner's private key (by compromising the owner's machine)
+    /// actual test here is of vm.addr(_pk) not being whitelisted
+    function oneOfOneOwnerExecute(uint256 _pk, uint256 _funcSeed) public countCall("oneOfOneOwnerExecute") {
+        addresses.push(USDC);
+        // attacker's address is not whitelisted
+        // addresses.push(vm.addr(_pk));
+        bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+        sign = _twoOfThreeAuthSign(keycrypt.nonce(), callData_);
+        _addUserOp(keycrypt.nonce(), callData_, sign);
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        ++ghost_Nonce;
+
+        callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", USDC, 0, _targetTokenFunc(_funcSeed, _pk));
+        sign = _oneOfOneOwnerSign(keycrypt.nonce(), callData_);
+        userOp.pop(); // remove previous op
+        _addUserOp(keycrypt.nonce(), callData_, sign); // note the updated nonce
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        if(_funcSeed == 2) {
+            IERC20(USDC).transferFrom(address(keycrypt), vm.addr(_pk), 1e15);
+        }
+
+        ++ghost_Nonce;
+    }
+
+    /// @dev function exposed: all target functions in _targetChangeFunc()
+    /// simulating non-auth 160-sized signs changing owner/guardian
+    function twoOfThreeNonAuthChangeOG1G2(uint256 _pk1, uint256 _pk2, uint256 _funcSeed) public countCall("twoOfThreeNonAuthChangeOG1G2") {
+        // (_pk1 + _pk2) % 2 == 0 is just to introduce randomness to the new owner being set
+        bytes memory callData_ = abi.encodeWithSignature(_targetChangeFunc(_funcSeed), (_pk1 + _pk2) % 2 == 0 ? vm.addr(_pk1) : vm.addr(_pk2));
+        sign = _twoOfThreeNonAuthSign(_pk1, _pk2, keycrypt.nonce(), callData_);
+        _addUserOp(keycrypt.nonce(), callData_, sign);
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        ++ghost_Nonce;
+    }
+
+    /// @dev functions exposed: initialize(), upgradeTo(), upgradeToAndCall()
+    /// simulating non-auth 160-sized signs trying to make the calls above
+    function twoOfThreeNonAuthUpgrade(uint256 _pk1, uint256 _pk2, uint256 _funcSeed) public countCall("twoOfThreeNonAuthUpgrade") {
+        bytes memory callData_;
+        ETH_Keycrypt maliciousKeycrypt = new ETH_Keycrypt(entryPoint);
+        uint256 seed = _funcSeed % 3;
+        if(seed == 0) {
+            callData_ = abi.encodeWithSignature("initialize(address,address,address)", vm.addr(_pk1), vm.addr(_pk2), vm.addr(_pk1));
+        } else if(seed == 1) {
+            callData_ = abi.encodeWithSignature("upgradeTo(address)", address(maliciousKeycrypt));
+        } else {
+            callData_ = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", address(maliciousKeycrypt), abi.encodeWithSignature("initialize(address,address,address)", vm.addr(_pk1), vm.addr(_pk2), vm.addr(_pk1)));
+        }
+        sign = _twoOfThreeNonAuthSign(_pk1, _pk2, keycrypt.nonce(), callData_);
+        _addUserOp(keycrypt.nonce(), callData_, sign);
+        entryPoint.handleOps(userOp, payable(msg.sender));
+
+        ++ghost_Nonce;
+    }
+
+    function _targetTokenFunc(uint256 _funcSeed, uint256 _pk) internal pure returns (bytes memory) {
+        string[] memory funcSig = new string[](8);
+        funcSig[0] = "transfer(address,uint256)";
+        funcSig[1] = "safeTransfer(address,uint256)";
+        funcSig[2] = "approve(address,uint256)";
+        funcSig[3] = "safeApprove(address,uint256)";
+        funcSig[4] = "increaseAllowance(address,uint256)";
+        funcSig[5] = "safeIncreaseAllowance(address,uint256)";
+        funcSig[6] = "decreaseAllowance(address,uint256)";
+        funcSig[7] = "safeDecreaseAllowance(address,uint256)";
+
+        return abi.encodeWithSignature(funcSig[_funcSeed % 8], vm.addr(_pk), 1e15);
+    }
+
+    function _targetChangeFunc(uint256 _funcSeed) internal pure returns (string memory) {
+        string[] memory funcSig = new string[](3);
+        funcSig[0] = "changeOwner(address)";
+        funcSig[1] = "changeGuardianOne(address)";
+        funcSig[2] = "changeGuardianTwo(address)";
+
+        return funcSig[_funcSeed % 3];
+    }
+
+    function _targetUpgradeFunc(uint256 _funcSeed) internal pure returns (string memory) {
+        string[] memory funcSig = new string[](3);
+        funcSig[0] = "initialize(address,address,address)";
+        funcSig[1] = "upgradeTo(address)";
+        funcSig[2] = "upgradeToAndCall(address,bytes)";
+
+        return funcSig[_funcSeed % 3];
     }
 
     function _oneOfOneOwnerSign(uint256 _nonce, bytes memory _callData) internal view returns (bytes memory _sign){

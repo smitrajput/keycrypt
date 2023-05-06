@@ -40,7 +40,12 @@
  *    changeGuardianOne(), changeGuardianTwo(), validateUserOp() returns 0
  * 7. For the wallet owning 1m ETH and 1B USDC, if (5) and (6) are false (at any of the 3 layers of permissions), then wallet balance stays the same.
  * 8. Number of successful txns = _nonce
+ * 9. getImplementation() = address(keycryptImpl)
+ * 10. owner = 19, guardian1 = 20, guardian2 = 21
 */
+
+// Holy Grail reference: https://mirror.xyz/horsefacts.eth/Jex2YVaO65dda6zEyfM_-DXlXhOWCAoSpOx5PLocYgw
+
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
@@ -74,7 +79,6 @@ contract KeycryptInvariants is Test {
     bytes[] funcSigs;
     UserOperation[] userOp;
     bytes sign;
-    // Util util;
 
     function setUp() public {
         mainnetFork = vm.createFork('https://eth-mainnet.g.alchemy.com/v2/BKt4FdcCBCJR7b5-KAdqNfoovPA7rFcx');
@@ -95,18 +99,38 @@ contract KeycryptInvariants is Test {
         IUSDC(USDC).configureMinter(0xE982615d461DD5cD06575BbeA87624fda4e3de17, 1_000_000_000 * 1e6);
         IUSDC(USDC).mint(address(keycrypt), 1_000_000_000 * 1e6);
         vm.stopPrank();
-        console.log('USDC balance', IERC20(USDC).balanceOf(address(keycrypt)));
 
-        bytes4[] memory selectors = new bytes4[](1);
+        bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = Handler.oneOfOneNonOwnerExecute.selector;
+        selectors[1] = Handler.oneOfOneOwnerExecute.selector;
+        selectors[2] = Handler.twoOfThreeNonAuthChangeOG1G2.selector;
+        selectors[3] = Handler.twoOfThreeNonAuthUpgrade.selector;
 
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
-
         targetContract(address(handler));
     }
 
     function invariant_unchangedTokenBalance() public {
         assertEq(address(keycrypt).balance, 1_000_000 ether);
         assert(IERC20(USDC).balanceOf(address(keycrypt)) == 1_000_000_000 * 1e6);
+    }
+
+    function invariant_unchangedOwnerAndGuardians() public {
+        assertEq(keycrypt.owner(), owner);
+        assertEq(keycrypt.guardian1(), guardian1);
+        assertEq(keycrypt.guardian2(), guardian2);
+    }
+
+    function invariant_unchangedImplementation() public {
+        assertEq(keycrypt.currentImplementation(), address(keycryptImpl));
+    }
+
+    function invariant_correctNonceIncrement() public {
+        assertEq(handler.ghost_Nonce(), keycrypt.nonce());
+    }
+
+    /// @dev gives the number of calls made to each target selector, in the last run
+    function invariant_callSummary() public view {
+        handler.callSummary();
     }
 }
