@@ -9,6 +9,8 @@ remappings = [
     "hardhat/=node_modules/hardhat/",
     "@solady/=lib/solady/"
 ]
+build_info = true
+build_info_path = "out/build-info"
 
 [fuzz]
 runs = 256
