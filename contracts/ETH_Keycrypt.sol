@@ -37,6 +37,12 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
 
     event ETH_KeycryptInitialized(IEntryPoint indexed entryPoint, address indexed owner, address guardian1, address guardian2);
     event LogSignatures(bytes indexed signature1, bytes indexed signature2);
+    event ChangeOwner(address indexed prevOwner, address indexed newOwner);
+    event ChangeGuardianOne(address indexed prevGuardian1, address indexed newGuardian1);
+    event ChangeGuardianTwo(address indexed prevGuardian2, address indexed newGuardian2);
+    event AddToWhitelist(address[] indexed addresses);
+    event RemoveFromWhitelist(address[] indexed addresses);
+    event Execute(address indexed target, uint256 indexed value, bytes indexed data);
 
     constructor(IEntryPoint anEntryPoint) {
         _entryPoint = anEntryPoint;
@@ -59,6 +65,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     function changeOwner(address _newOwner) external onlyProxy onlyEntryPoint {
         // require that new owner is not a guardian, current owner, address(0)
         require(_newOwner != address(0) && _newOwner != guardian1 && _newOwner != guardian2 && _newOwner != owner, "invalid new owner");
+        emit ChangeOwner(owner, _newOwner);
         owner = _newOwner;
     }
 
@@ -66,6 +73,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     function changeGuardianOne(address _newGuardian1) external onlyProxy onlyEntryPoint {
         // require that new guardian1 is not a guardian, current owner, address(0)
         require(_newGuardian1 != address(0) && _newGuardian1 != guardian1 && _newGuardian1 != guardian2 && _newGuardian1 != owner, "invalid new guardian1");
+        emit ChangeGuardianOne(guardian1, _newGuardian1);
         guardian1 = _newGuardian1;
     }
 
@@ -73,6 +81,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     function changeGuardianTwo(address _newGuardian2) external onlyProxy onlyEntryPoint {
         // require that new guardian2 is not a guardian, current owner, address(0)
         require(_newGuardian2 != address(0) && _newGuardian2 != guardian1 && _newGuardian2 != guardian2 && _newGuardian2 != owner, "invalid new guardian2");
+        emit ChangeGuardianTwo(guardian2, _newGuardian2);
         guardian2 = _newGuardian2;
     }
 
@@ -82,6 +91,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = true;
         }
+        emit AddToWhitelist(_addresses);
     }
 
     // 2/3 multisig
@@ -89,6 +99,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         for (uint256 i = 0; i < _addresses.length; i++) {
             isWhitelisted[_addresses[i]] = false;
         }
+        emit RemoveFromWhitelist(_addresses);
     }
 
     /** 1/1 multisig
@@ -125,9 +136,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     }
 
     /// adding access checks in upgradeTo() and upgradeToAndCall() of UUPSUpgradeable
-    function _authorizeUpgrade(address _newImplementation) internal view override onlyEntryPoint {
-        // new implementation must be a contract
-    }
+    function _authorizeUpgrade(address _newImplementation) internal view override onlyEntryPoint {}
 
     /// implement template method of ETH_BaseAccount
     function _validateAndUpdateNonce(UserOperation calldata userOp) internal override {
@@ -234,13 +243,14 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         return true;
     }
 
-    function _call(address target, uint256 value, bytes memory data) internal {
-        (bool success, bytes memory result) = target.call{value : value}(data);
+    function _call(address _target, uint256 _value, bytes memory _data) internal {
+        (bool success, bytes memory result) = _target.call{value : _value}(_data);
         if (!success) {
             assembly {
                 revert(add(result, 32), mload(result))
             }
         }
+        emit Execute(_target, _value, _data);
     }
 
     function isValidSignature(
