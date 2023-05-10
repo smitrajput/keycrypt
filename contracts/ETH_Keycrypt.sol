@@ -20,14 +20,39 @@ import "forge-std/Test.sol";
   */
 contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializable {
     using ECDSA for bytes32;
-    // constant's storage slot will be ignored iirc
+
+    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*                       CUSTOM ERRORS                        */
+    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+
+    error InvalidNewOwner(address currentOwner, address newOwner);
+    error InvalidNewGuardianOne(address currentGuardian1, address newGuardian1);
+    error InvalidNewGuardianTwo(address currentGuardian2, address newGuardian2);
+    error InvalidNonce(uint256 accountNonce, uint256 userOpNonce);
+
+    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*                           EVENTS                           */
+    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+
+    event ETH_KeycryptInitialized(IEntryPoint indexed entryPoint, address indexed owner, address guardian1, address guardian2);
+    event ChangeOwner(address indexed prevOwner, address indexed newOwner);
+    event ChangeGuardianOne(address indexed prevGuardian1, address indexed newGuardian1);
+    event ChangeGuardianTwo(address indexed prevGuardian2, address indexed newGuardian2);
+    event AddToWhitelist(address[] indexed addresses);
+    event RemoveFromWhitelist(address[] indexed addresses);
+    event Execute(address indexed target, uint256 indexed value, bytes indexed data);
+
+    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*                       STORAGE                              */
+    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+
     bytes4 constant EIP1271_SUCCESS_RETURN_VALUE = 0x1626ba7e;
 
     // filler member, to push the nonce and owner to the same slot
     // the "Initializeble" class takes 2 bytes in the first slot
     bytes28 private _filler;
 
-    //explicit sizes of nonce, to fit a single storage cell with "owner"
+    // explicit sizes of nonce, to fit a single storage cell with "owner"
     uint96 private _nonce;
     address public owner;
     address public guardian1;
@@ -35,14 +60,6 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     mapping(address => bool) public isWhitelisted;
     IEntryPoint private immutable _entryPoint;
 
-    event ETH_KeycryptInitialized(IEntryPoint indexed entryPoint, address indexed owner, address guardian1, address guardian2);
-    event LogSignatures(bytes indexed signature1, bytes indexed signature2);
-    event ChangeOwner(address indexed prevOwner, address indexed newOwner);
-    event ChangeGuardianOne(address indexed prevGuardian1, address indexed newGuardian1);
-    event ChangeGuardianTwo(address indexed prevGuardian2, address indexed newGuardian2);
-    event AddToWhitelist(address[] indexed addresses);
-    event RemoveFromWhitelist(address[] indexed addresses);
-    event Execute(address indexed target, uint256 indexed value, bytes indexed data);
 
     constructor(IEntryPoint anEntryPoint) {
         _entryPoint = anEntryPoint;
@@ -64,7 +81,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     // 2/3 multisig
     function changeOwner(address _newOwner) external onlyProxy onlyEntryPoint {
         // require that new owner is not a guardian, current owner, address(0)
-        require(_newOwner != address(0) && _newOwner != guardian1 && _newOwner != guardian2 && _newOwner != owner, "invalid new owner");
+        if(_newOwner == address(0) || _newOwner == guardian1 || _newOwner == guardian2 || _newOwner == owner) {
+            revert InvalidNewOwner(owner, _newOwner);
+        }
         emit ChangeOwner(owner, _newOwner);
         owner = _newOwner;
     }
@@ -72,7 +91,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     // 2/3 multisig
     function changeGuardianOne(address _newGuardian1) external onlyProxy onlyEntryPoint {
         // require that new guardian1 is not a guardian, current owner, address(0)
-        require(_newGuardian1 != address(0) && _newGuardian1 != guardian1 && _newGuardian1 != guardian2 && _newGuardian1 != owner, "invalid new guardian1");
+        if(_newGuardian1 == address(0) || _newGuardian1 == guardian1 || _newGuardian1 == guardian2 || _newGuardian1 == owner) {
+            revert InvalidNewGuardianOne(guardian1, _newGuardian1);
+        }
         emit ChangeGuardianOne(guardian1, _newGuardian1);
         guardian1 = _newGuardian1;
     }
@@ -80,7 +101,9 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     // 2/3 multisig
     function changeGuardianTwo(address _newGuardian2) external onlyProxy onlyEntryPoint {
         // require that new guardian2 is not a guardian, current owner, address(0)
-        require(_newGuardian2 != address(0) && _newGuardian2 != guardian1 && _newGuardian2 != guardian2 && _newGuardian2 != owner, "invalid new guardian2");
+        if(_newGuardian2 == address(0) || _newGuardian2 == guardian1 || _newGuardian2 == guardian2 || _newGuardian2 == owner) {
+            revert InvalidNewGuardianTwo(guardian2, _newGuardian2);
+        }
         emit ChangeGuardianTwo(guardian2, _newGuardian2);
         guardian2 = _newGuardian2;
     }
@@ -139,18 +162,21 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     function _authorizeUpgrade(address _newImplementation) internal view override onlyEntryPoint {}
 
     /// implement template method of ETH_BaseAccount
-    function _validateAndUpdateNonce(UserOperation calldata userOp) internal override {
-        require(_nonce++ == userOp.nonce, "account: invalid nonce");
+    function _validateAndUpdateNonce(UserOperation calldata _userOp) internal override {
+        if(_nonce != _userOp.nonce) {
+            revert InvalidNonce(_nonce, _userOp.nonce);
+        }
+        ++_nonce;
     }
 
     /// implement template method of ETH_BaseAccount
     function _validateSignature(
-        UserOperation calldata userOp,
-        bytes32 userOpHash
+        UserOperation calldata _userOp,
+        bytes32 _userOpHash
     ) internal override virtual returns (uint256 validationData) {
-        bytes32 hash = userOpHash.toEthSignedMessageHash();
-        if(isValidSignature(hash, userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE &&
-            _validatePermissions(userOp)) {
+        bytes32 hash = _userOpHash.toEthSignedMessageHash();
+        if(isValidSignature(hash, _userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE &&
+            _validatePermissions(_userOp)) {
             return 0;
         } else {
             return SIG_VALIDATION_FAILED;
@@ -264,7 +290,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                 magic = bytes4(0);
             }
             address recoveredAddr = _hash.recover(_signature);
-            // Note, that we should abstain from using the require here in order to allow for fee estimation to work
+            // NOTE: abstain from using the require here in order to allow for fee estimation to work
             if(recoveredAddr != owner) {
                 magic = bytes4(0);
             }
@@ -276,7 +302,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
             address recoveredAddr1 = _hash.recover(signature1);
             address recoveredAddr2 = _hash.recover(signature2);
 
-            // Note, that we should abstain from using the require here in order to allow for fee estimation to work
+            // NOTE: abstain from using the require here in order to allow for fee estimation to work
             // Either of the recovered addresses should be owner and the other address should be either guardian1 or guardian2
             if(recoveredAddr1 == owner) {
                 if(recoveredAddr2 != guardian1 && recoveredAddr2 != guardian2) {
