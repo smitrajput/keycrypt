@@ -23,7 +23,7 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     // constant's storage slot will be ignored iirc
     bytes4 constant EIP1271_SUCCESS_RETURN_VALUE = 0x1626ba7e;
 
-    //filler member, to push the nonce and owner to the same slot
+    // filler member, to push the nonce and owner to the same slot
     // the "Initializeble" class takes 2 bytes in the first slot
     bytes28 private _filler;
 
@@ -57,21 +57,21 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
 
     // 2/3 multisig
     function changeOwner(address _newOwner) external onlyProxy onlyEntryPoint {
-        //require that new owner is not a guardian, current owner, address(0)
+        // require that new owner is not a guardian, current owner, address(0)
         require(_newOwner != address(0) && _newOwner != guardian1 && _newOwner != guardian2 && _newOwner != owner, "invalid new owner");
         owner = _newOwner;
     }
 
     // 2/3 multisig
     function changeGuardianOne(address _newGuardian1) external onlyProxy onlyEntryPoint {
-        //require that new guardian1 is not a guardian, current owner, address(0)
+        // require that new guardian1 is not a guardian, current owner, address(0)
         require(_newGuardian1 != address(0) && _newGuardian1 != guardian1 && _newGuardian1 != guardian2 && _newGuardian1 != owner, "invalid new guardian1");
         guardian1 = _newGuardian1;
     }
 
     // 2/3 multisig
     function changeGuardianTwo(address _newGuardian2) external onlyProxy onlyEntryPoint {
-        //require that new guardian2 is not a guardian, current owner, address(0)
+        // require that new guardian2 is not a guardian, current owner, address(0)
         require(_newGuardian2 != address(0) && _newGuardian2 != guardian1 && _newGuardian2 != guardian2 && _newGuardian2 != owner, "invalid new guardian2");
         guardian2 = _newGuardian2;
     }
@@ -140,8 +140,6 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
         bytes32 userOpHash
     ) internal override virtual returns (uint256 validationData) {
         bytes32 hash = userOpHash.toEthSignedMessageHash();
-        // if (owner != hash.recover(userOp.signature))
-        //     return SIG_VALIDATION_FAILED;
         if(isValidSignature(hash, userOp.signature) == EIP1271_SUCCESS_RETURN_VALUE &&
             _validatePermissions(userOp)) {
             return 0;
@@ -163,47 +161,27 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
          */
         if(userOp.signature.length == 65) {
             // to disallow the owner from calling this contract (esp. changeOwner()) WITHOUT guardians
-            // UserOperation memory userOp = abi.decode(abi.encodePacked(_hash), (UserOperation));
             bytes4 funcSig = bytes4(userOp.callData[:4]);
-            // console.log('funcSigReceived, funcSigActual');
-            // console.logBytes4(funcSig);
-            // console.logBytes4(bytes4(keccak256("addDeposit(uint256)")));
             if(funcSig == bytes4(keccak256("addDeposit(uint256)"))) {
                 return true;
             }
-            console.logBytes4(bytes4(keccak256("execute(address,uint256,bytes)")));
             if(funcSig == bytes4(keccak256("execute(address,uint256,bytes)"))) {
                 address dest; uint256 value; bytes memory data;
                 (dest, value, data) = abi.decode(userOp.callData[4:], (address, uint256, bytes));
-                // console.log('dest', dest);
-                // console.log('value', value);
-                // console.logBytes(data);
-                // index range access doesn't work for data as it is in memory
-                // bytes4 internalFuncSig = bytes4(data[:4]);
-                // (to, amount) = abi.decode(data[4:], (address, uint256));
                 // extract first 4 bytes from 'data' without using index range access
                 bytes4 internalFuncSig; address to;
                 assembly {
                     internalFuncSig := mload(add(data, 32))
                     to := mload(add(data, 36))
                 }
-                // console.logBytes4(internalFuncSig);
-                // console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
-                // console.log('to', to);
-                // console.log('isWhitelisted[dest]', isWhitelisted[dest]);
                 if(isWhitelisted[dest]) {
                     return _checkWhitelistedTokenInteractions(internalFuncSig, to);
                 }
             }
-            console.logBytes4(bytes4(keccak256("executeBatch(address[],bytes[])")));
             if(funcSig == bytes4(keccak256("executeBatch(address[],bytes[])"))) {
                 address[] memory dest;
                 bytes[] memory data;
                 (dest, data) = abi.decode(userOp.callData[4:], (address[], bytes[]));
-                // console.log('dest[0]', dest[0]);
-                // console.log('dest[2]', dest[2]);
-                // console.logBytes(data[0]);
-                // console.logBytes(data[2]);
                 bytes4 internalFuncSig; address to;
                 bytes memory dataMem;
                 for(uint256 i = 0; i < dest.length; i++) {
@@ -215,9 +193,6 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
                         internalFuncSig := mload(add(dataMem, 32))
                         to := mload(add(dataMem, 36))
                     }
-                    // console.logBytes4(internalFuncSig);
-                    // console.logBytes4(bytes4(keccak256("approve(address,uint256)")));
-                    // console.log('to', to);
                     if(!_checkWhitelistedTokenInteractions(internalFuncSig, to)) return false;
                 }
                 return true;
@@ -274,24 +249,11 @@ contract ETH_Keycrypt is IERC1271, ETH_BaseAccount, UUPSUpgradeable, Initializab
     ) public view override returns (bytes4 magic) {
         magic = EIP1271_SUCCESS_RETURN_VALUE;
 
-        // activate this snippet if issues are faced in estimating fees of some signs
-        // if (_signature.length != 130) {
-        //     // Signature is invalid, but we need to proceed with the signature verification as usual
-        //     // in order for the fee estimation to work correctly
-        //     _signature = new bytes(130);
-            
-        //     // Making sure that the signatures look like a valid ECDSA signature and are not rejected rightaway
-        //     // while skipping the main verification process.
-        //     _signature[64] = bytes1(uint8(27));
-        //     _signature[129] = bytes1(uint8(27));
-        // }
-
         if(_signature.length == 65) {
             if(!_checkValidECDSASignatureFormat(_signature)) {
                 magic = bytes4(0);
             }
             address recoveredAddr = _hash.recover(_signature);
-            console.log('recoveredAddr', recoveredAddr);
             // Note, that we should abstain from using the require here in order to allow for fee estimation to work
             if(recoveredAddr != owner) {
                 magic = bytes4(0);

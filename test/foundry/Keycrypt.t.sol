@@ -47,7 +47,6 @@ contract KeycryptTest is Test {
         address keycryptAddr = soladyFactory.deployDeterministicAndCall(address(keycryptImpl), owner, 0, data);
         keycrypt = ETH_Keycrypt(payable(keycryptAddr));
         vm.deal(address(keycrypt), 100 ether);
-        // console.log('keycrypt balance: %s, owner: %s, address: %s', address(keycrypt).balance / 1e18, keycrypt.owner(), address(keycrypt));
         // sign = hex"edd79d1d9520e698e726b63b5a8959162da3a899727ae68d012bdb60000093b17348db30ff8fae84ed1418b657f1e1b15ee299e725f0b497a2addffcf7ea705f1c7e5d7426781b7c4792ce12b5b1d19d0809a29e9e66a92493dbc41120df47d14204aa73c3abba722cd6b3fa367889881ca0303d6562e1b55930547eb950bc62db1c";
         util = new Util();
     }
@@ -229,40 +228,6 @@ contract KeycryptTest is Test {
         assertGe(depositBefore - depositAfter, _withdrawalAmt);
     }
 
-    // failed selective fuzzing
-    // function test_execute(address _token, uint256 _amount, bytes calldata _data, address _to) public {
-    //     // vm.assume _token is DAI or USDC or USDT, and _data is abi encoded approve, safeApprove, transfer, safeTransfer, 
-    //     // increaseAllowance, safeIncreaseAllowance, decreaseAllowance, safeDecreaseAllowance
-    //     vm.assume((_token == DAI || _token == USDC || _token == USDT) && 
-    //               (keccak256(_data) == keccak256(abi.encodeWithSignature("approve(address,uint256)", _to, _amount))
-    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeApprove(address,uint256)", _to, _amount))
-    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("transfer(address,uint256)", _to, _amount))
-    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeTransfer(address,uint256)", _to, _amount))
-    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("increaseAllowance(address,uint256)", _to, _amount))
-    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeIncreaseAllowance(address,uint256)", _to, _amount))
-    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("decreaseAllowance(address,uint256)", _to, _amount))
-    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeDecreaseAllowance(address,uint256)", _to, _amount))));
-        
-    //     // WHITELISTING
-    //     addresses.push(_token);
-    //     addresses.push(_to);
-    //     console.log('GUARDIAN1', _to);
-    //     bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
-    //     sign = _twoOfThreeSign(0, callData_);
-    //     _addUserOp(0, callData_, sign);
-    //     //execute whitelisting
-    //     entryPoint.handleOps(userOp, payable(msg.sender));
-
-    //     // EXECUTE
-    //     callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", _token, 0, _data);
-    //     sign = _oneOfOneSign(1, callData_);
-    //     userOp.pop(); // remove previous op
-    //     _addUserOp(1, callData_, sign); // note the updated nonce
-    //     entryPoint.handleOps(userOp, payable(msg.sender));
-
-    //     // assertEq(IERC20(DAI).allowance(address(keycrypt), _to), 1e18);
-    // }
-
     function test_execute() public {
         // WHITELISTING
         addresses.push(DAI);
@@ -335,8 +300,6 @@ contract KeycryptTest is Test {
         sign = _oneOfOneSign(1, callData_);
         userOp.pop(); // remove previous op
         _addUserOp(1, callData_, sign); // note the updated nonce
-        // vm.expectRevert("invalid signature");
-        // entryPoint.handleOps(userOp, payable(msg.sender));
         (bool success, ) = address(entryPoint).call(abi.encodeWithSignature("handleOps(bytes[],address)", userOp, payable(msg.sender)));
         assertEq(success, false);
     }
@@ -348,7 +311,7 @@ contract KeycryptTest is Test {
         bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
         sign = _twoOfThreeSign(0, callData_);
         _addUserOp(0, callData_, sign);
-        //execute whitelisting
+        // execute whitelisting
         entryPoint.handleOps(userOp, payable(msg.sender));
 
         // EXECUTE
@@ -356,8 +319,6 @@ contract KeycryptTest is Test {
         sign = _oneOfOneSign(1, callData_);
         userOp.pop(); // remove previous op
         _addUserOp(1, callData_, sign); // note the updated nonce
-        // vm.expectRevert("invalid signature");
-        // entryPoint.handleOps(userOp, payable(msg.sender));
         (bool success, ) = address(entryPoint).call(abi.encodeWithSignature("handleOps(bytes[],address)", userOp, payable(msg.sender)));
         assertEq(success, false);
     }
@@ -384,8 +345,6 @@ contract KeycryptTest is Test {
         sign = _oneOfOneSign(1, callData_);
         userOp.pop(); // remove previous op
         _addUserOp(1, callData_, sign); // note the updated nonce
-        // vm.expectRevert("invalid signature");
-        // entryPoint.handleOps(userOp, payable(msg.sender));
         (bool success, ) = address(entryPoint).call(abi.encodeWithSignature("handleOps(bytes[],address)", userOp, payable(msg.sender)));
         assertEq(success, false);
     }
@@ -443,8 +402,6 @@ contract KeycryptTest is Test {
         });
         userOpHash = keccak256(abi.encode(util.hash(userOpData), address(entryPoint), block.chainid));
     }
-
-    // receive() external payable {}
 }
 
 contract Util {
@@ -470,6 +427,38 @@ contract Util {
 }
 
 
+    // failed selective fuzzing
+    // function test_execute(address _token, uint256 _amount, bytes calldata _data, address _to) public {
+    //     // vm.assume _token is DAI or USDC or USDT, and _data is abi encoded approve, safeApprove, transfer, safeTransfer, 
+    //     // increaseAllowance, safeIncreaseAllowance, decreaseAllowance, safeDecreaseAllowance
+    //     vm.assume((_token == DAI || _token == USDC || _token == USDT) && 
+    //               (keccak256(_data) == keccak256(abi.encodeWithSignature("approve(address,uint256)", _to, _amount))
+    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeApprove(address,uint256)", _to, _amount))
+    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("transfer(address,uint256)", _to, _amount))
+    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeTransfer(address,uint256)", _to, _amount))
+    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("increaseAllowance(address,uint256)", _to, _amount))
+    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeIncreaseAllowance(address,uint256)", _to, _amount))
+    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("decreaseAllowance(address,uint256)", _to, _amount))
+    //               || keccak256(_data) == keccak256(abi.encodeWithSignature("safeDecreaseAllowance(address,uint256)", _to, _amount))));
+        
+    //     // WHITELISTING
+    //     addresses.push(_token);
+    //     addresses.push(_to);
+    //     console.log('GUARDIAN1', _to);
+    //     bytes memory callData_ = abi.encodeWithSignature("addToWhitelist(address[])", addresses);
+    //     sign = _twoOfThreeSign(0, callData_);
+    //     _addUserOp(0, callData_, sign);
+    //     //execute whitelisting
+    //     entryPoint.handleOps(userOp, payable(msg.sender));
 
+    //     // EXECUTE
+    //     callData_ = abi.encodeWithSignature("execute(address,uint256,bytes)", _token, 0, _data);
+    //     sign = _oneOfOneSign(1, callData_);
+    //     userOp.pop(); // remove previous op
+    //     _addUserOp(1, callData_, sign); // note the updated nonce
+    //     entryPoint.handleOps(userOp, payable(msg.sender));
+
+    //     // assertEq(IERC20(DAI).allowance(address(keycrypt), _to), 1e18);
+    // }
 
 
