@@ -11,7 +11,7 @@ The last pill that 🐋, 🐳 need for a peaceful sleep.<br/>
 ## Feature Set
 1. Based on ERC4337 (account-abstraction), decoupling signature creation from submission, allowing owners to sign off-chain and anyone to sponsor their gas fees and submit the signatures on their behalf.<br/>
 2. Social recovery: owner private keys once compromised, can be replaced afresh, with the help of 2 other 'guardian' keys. <br/>
-3. 3 layers of permissions for owner-signed risky transactions (ones that might empty the wallet). <br/>
+3. 4 layers of permissions for owner-signed risky transactions (ones that might empty the wallet). <br/>
 4. Allows arbitrary interaction with any contract, for doubly-signed (owner + guardian) transactions. <br/>
 
 ## Tech
@@ -24,21 +24,28 @@ The last pill that 🐋, 🐳 need for a peaceful sleep.<br/>
 3. Wallet implements UUPS upgradable pattern (the fixed one 😄). Proxies are deployed cheaply using [Solady's ERC1967Factory](https://github.com/Vectorized/solady/blob/main/src/utils/ERC1967Factory.sol).
 4. [Invariant test suite](https://github.com/smitrajput/keycrypt/blob/main/test/foundry/invariants/Keycrypt.invariants.t.sol), inspired from [horsefacts' article](https://mirror.xyz/horsefacts.eth/Jex2YVaO65dda6zEyfM_-DXlXhOWCAoSpOx5PLocYgw). <br/>
 
+
+## Layers of Swiss Cheese 🧀
+1. **Layer 1**: only signatures of a standard structure are accepted, which have been signed by either the owner (1/1 signature), or owner + one of the guardians (2/3 signature). [More Details](https://github.com/smitrajput/keycrypt#signature-formats-accepted).
+2. **Layer 2**: 2/3 signatures can call any function on any contract without prior whitelisting, but 1/1 signatures can only call certain functions on certain contracts. On the wallet contract, they can only call `addDeposit()`, `execute()` and `executeBatch()` (with further restrictions on the latter two as seen below).
+3. **Layer 3**: 1/1 signatures can only interact with addresses that have been whitelisted previously with a 2/3 signature calling `addToWhitelist()` on the wallet contract.
+4. **Layer 4**: for 1/1 signatures interacting with whitelisted addresses, if the whitelisted address happens to be a token, then the `to` address i.e. the address receiving the tokens or being approved for transferring the tokens, must be whitelisted previously with a 2/3 signature calling `addToWhitelist()` on the wallet contract. <br/>
+
+## Quad-cheese Burger in Action
+Chad owns $1.1B USDC in his keycrypt wallet and is currently vacationing in Japan, spending his bull run gains, and has set Aron and Bella as his guardians. But due to a [recent data breach in LastPass](https://blog.lastpass.com/2022/12/notice-of-recent-security-incident/), his private keys were acquired by Kim Not Jong-Un, who is now trying to empty his wallet.
+1. Kim with invalid signatures (of sizes other than 65, 130 bytes) or ones with the correct size but not signed by Chad or his guardians, can't interact with the wallet (Layer 1).
+2. Kim can't change the owner or guardians to gain complete control of the wallet, as he can't call `changeOwner()` or `changeGuardianOne/Two()` all by himself (Layer 2).
+3. Kim manages to call `transfer()` on the USDC contract via `execute()` on the wallet contract, but can't send the tokens to his address as it hasn't been whitelisted previously (Layer 4). He can't even whitelist it now, as he can't call `addToWhitelist()` all by himself (Layer 2).
+4. Kim acts smart and writes a malicious contract that can pull funds out of the wallet, and calls `execute()` on the wallet contract. But it doesn't work too as the malicious contract hasn't been whitelisted previously (Layer 3), moreover he can't whitelist it now as he can't call `addToWhitelist()` all by himself (Layer 2).
+
+Chad checks etherscan and sees some 'failed' transactions on his wallet and goes, "Ah! Not again, this is the 5th time!". Frustrated, not out of fear, but out of boredom to change the owner once again. Calls Bella, and sends a 2/3 signature to change the current owner. Kim in dismay, returns to his [pleasure squad](https://youtu.be/EL4nlb_yuYE) after realising this transaction. <br/>
+
+
+
 ## Signature Formats Accepted
 1. Ensure the data being signed in the signatures, conforms to the EIP712 standard (see [here](https://eips.ethereum.org/EIPS/eip-712)). 
 2. For verifying the signatures originating from this wallet, call `isValidSignature(bytes32 _hash, bytes memory _signature)` on the wallet contract with the appropriate `_hash` i.e. the hash of the data, and the `signature` itself.
 3. Signature sizes: 
-    - 65 bytes (1/1 from now): singly signed (owner)
-    - 130 bytes (2/3 from now): doubly signed (owner + one of the guardians)
+    - 65 bytes: singly signed (owner)
+    - 130 bytes: doubly signed (owner + one of the guardians)
 Rest of the signatures are considered garbage.
-
-## Whitelisting Wall
-The following addresses need to be whitelisted with a combined signature of owner + one of the guardians:
-1. every address that the wallet wishes to interact with directly
-2. every address the wallet wishes to send tokens/ETH to.
-This is to disallow the owner from interacting with addresses (all by him/herself) that might drain its funds. After whitelisting, the owner can interact with the whitelisted addresses, with 1/1 signatures. Otherwise, the owner needs 2/3 signatures to interact with any address.
-
-## Value Prop
-Wallet consists of 3 primary entities: owner and 2 guardians. It is assumed that the owner's private keys are compromised, hence:
-1. owner is not allowed to change the current owner or any of the guardians, all by him/herself. It needs one more signature from any of the guardians to do so. So in case the owner's private keys are actually compromised, the real owner can create a signature with one of the guardians and replace the owner's address with a new one, while the malicious actor won't be able to do so as the guardians won't sign off on the transaction.
-2. owner can also not send any tokens or ETH to any address that hasn't been whitelisted previously by a combined signature of owner + guardian, all by him/herself. This is to prevent the malicious actor from sending funds to his/her own address after compromising the owner.
