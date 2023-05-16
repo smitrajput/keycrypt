@@ -62,8 +62,14 @@ Chad checks etherscan and sees some 'failed' transactions on his wallet and goes
 Rest of the signatures are considered garbage.
 
 ## Usage
-1. Users need to sign transactions off-chain, and submit them to the [alt mempool](https://eips.ethereum.org/EIPS/eip-4337#abstract) dedicated for ERC4337-specific transactions, as the wallet contract only accepts transactions initiated from the [EntryPoint contract](https://eips.ethereum.org/EIPS/eip-4337#definitions) (for security reasons).
-2. For gas fees, 
+1. Running the project locally:
+    - `git clone git@github.com:smitrajput/keycrypt.git && cd keycrypt`
+    - install foundry (follow [this section](https://book.getfoundry.sh/getting-started/installation#using-foundryup))
+    - `npm i --force` (to circumvent zkSync deps)
+    - `forge install`
+    - `forge test` <br/> should look something like this: <img width="750" alt="Screenshot 2023-05-16 at 1 12 22 PM" src="https://github.com/smitrajput/keycrypt/assets/22425782/a7833bb3-f817-44c8-ae54-2cd66e2ea1a1">
+2. Users need to sign transactions off-chain, and submit them to the [alt mempool](https://eips.ethereum.org/EIPS/eip-4337#abstract) dedicated for ERC4337-specific transactions, as the wallet contract only accepts transactions initiated from the [EntryPoint contract](https://eips.ethereum.org/EIPS/eip-4337#definitions) (for security reasons).
+3. For gas fees, 
     - users willing to pay for it themselves, can directy send ETH to the wallet contract
     - users willing to get it sponsored, can ask their sponsors to send ETH directly to wallet contract, or call `addDeposit()` on the wallet contract, sending the required ETH along with it (this function deposits ETH directly in the EntryPoint contract). <br/>
 
