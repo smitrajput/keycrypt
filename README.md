@@ -11,7 +11,7 @@ The last pill that 🐋, 🐳 need for a peaceful sleep.<br/>
 ## Table of Contents
 1. [Feature Set](#feature-set)
 2. [Tech](#tech)
-3. [Layers of Swiss Cheese 🧀](#layers-of-swiss-cheese-🧀) (Security)
+3. [Layers of Swiss Cheese 🧀](#layers-of-swiss-cheese-) (Security)
 4. [Quad-cheese Burger in Action](#quad-cheese-burger-in-action)
 5. [Signature Formats Accepted](#signature-formats-accepted)
 6. [Usage](#usage)
@@ -35,7 +35,7 @@ The last pill that 🐋, 🐳 need for a peaceful sleep.<br/>
 4. Wallet implements UUPS upgradable pattern (the fixed one 😄). Proxies are deployed cheaply using [Solady's ERC1967Factory](https://github.com/Vectorized/solady/blob/main/src/utils/ERC1967Factory.sol). <br/>
 
 
-## Layers of Swiss Cheese 🧀 
+## Layers of Swiss Cheese 🧀 / Security
 1. **Layer 1**: only signatures of a standard structure are accepted, which have been signed by either the owner (1/1 signature), or owner + one of the guardians (2/3 signature). [More Details](https://github.com/smitrajput/keycrypt#signature-formats-accepted).
 2. **Layer 2**: 2/3 signatures can call any function on any contract without prior whitelisting, but 1/1 signatures can only call certain functions on certain contracts. On the wallet contract, they can only call `addDeposit()`, `execute()` and `executeBatch()` (with further restrictions on the latter two as seen below).
 3. **Layer 3**: 1/1 signatures can only interact with addresses that have been whitelisted previously with a 2/3 signature calling `addToWhitelist()` on the wallet contract.
