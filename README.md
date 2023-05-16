@@ -67,7 +67,7 @@ Rest of the signatures are considered garbage.
     - install foundry (follow [this section](https://book.getfoundry.sh/getting-started/installation#using-foundryup))
     - `npm i --force` (to circumvent zkSync deps)
     - `forge install`
-    - `forge test` <br/> should look something like this: <img width="750" alt="Screenshot 2023-05-16 at 1 12 22 PM" src="https://github.com/smitrajput/keycrypt/assets/22425782/a7833bb3-f817-44c8-ae54-2cd66e2ea1a1">
+    - `forge test --via-ir` <br/> should look something like this: <img width="750" alt="Screenshot 2023-05-16 at 1 12 22 PM" src="https://github.com/smitrajput/keycrypt/assets/22425782/a7833bb3-f817-44c8-ae54-2cd66e2ea1a1">
 2. Users need to sign transactions off-chain, and submit them to the [alt mempool](https://eips.ethereum.org/EIPS/eip-4337#abstract) dedicated for ERC4337-specific transactions, as the wallet contract only accepts transactions initiated from the [EntryPoint contract](https://eips.ethereum.org/EIPS/eip-4337#definitions) (for security reasons).
 3. For gas fees, 
     - users willing to pay for it themselves, can directy send ETH to the wallet contract
