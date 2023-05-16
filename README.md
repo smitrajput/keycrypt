@@ -11,7 +11,7 @@ The last pill that 🐋, 🐳 need for a peaceful sleep.<br/>
 ## Table of Contents
 1. [Feature Set](#feature-set)
 2. [Tech](#tech)
-3. [Layers of Swiss Cheese 🧀](#layers-of-swiss-cheese-) (Security)
+3. [Layers of Swiss Cheese 🧀](#layers-of-swiss-cheese---security)
 4. [Quad-cheese Burger in Action](#quad-cheese-burger-in-action)
 5. [Signature Formats Accepted](#signature-formats-accepted)
 6. [Usage](#usage)
