@@ -48,4 +48,11 @@ Chad checks etherscan and sees some 'failed' transactions on his wallet and goes
 3. Signature sizes: 
     - 65 bytes: singly signed (owner)
     - 130 bytes: doubly signed (owner + one of the guardians)
+     
 Rest of the signatures are considered garbage.
+
+## Usage
+1. Users need to sign transactions off-chain, and submit them to the [alt mempool](https://eips.ethereum.org/EIPS/eip-4337#abstract) dedicated for ERC4337-specific transactions, as the wallet contract only accepts transactions initiated from the [EntryPoint contract](https://eips.ethereum.org/EIPS/eip-4337#definitions) (for security reasons).
+2. For gas fees, 
+    - users willing to pay for it themselves, can directy send ETH to the wallet contract
+    - users willing to get it sponsored, can ask their sponsors to send ETH directly to wallet contract, or call `addDeposit()` on the wallet contract, sending the required ETH along with it (this function deposits ETH directly in the EntryPoint contract). <br/>
