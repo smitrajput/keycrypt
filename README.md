@@ -43,7 +43,7 @@ The last pill that 🐋, 🐳 need for a peaceful sleep.<br/>
 3. **Layer 3**: 1/1 signatures can only interact with addresses that have been whitelisted previously with a 2/3 signature calling `addToWhitelist()` on the wallet contract.
 4. **Layer 4**: for 1/1 signatures interacting with whitelisted addresses, if the whitelisted address happens to be a token, then the `to` address i.e. the address receiving the tokens or being approved for transferring the tokens, must be whitelisted previously with a 2/3 signature calling `addToWhitelist()` on the wallet contract. <br/>
 
-## Quad-cheese Burger in Action
+## Quad-cheese 🍔 in Action
 Chad owns $1.1B USDC in his keycrypt wallet and is currently vacationing in Japan, spending his bull run gains, and has set Aron and Bella as his guardians. But due to his [recent mistaken upgrade in Ledger](https://twitter.com/Mudit__Gupta/status/1658368265687556097?s=20), his private keys were acquired by Kim Not Jong-Un, who is now trying to empty his wallet.
 1. Kim with invalid signatures (of sizes other than 65, 130 bytes) or ones with the correct size but not signed by Chad or his guardians, can't interact with the wallet (Layer 1).
 2. Kim can't change the owner or guardians to gain complete control of the wallet, as he can't call `changeOwner()` or `changeGuardianOne/Two()` all by himself (Layer 2).
