@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 /* Assumptions:
  * 1. All proxies are created from Solady's ERC1967ProxyFactory (which is out of scope for this test suite)
  * 2. All wallet proxies are ERC1967Proxy and implementations are UUPS compatible
