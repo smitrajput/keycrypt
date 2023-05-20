@@ -2,9 +2,11 @@
 <img width="1189" alt="Screenshot 2023-05-11 at 10 17 45 PM" src="https://github.com/smitrajput/keycrypt/assets/22425782/7e9034c6-904d-43cd-bb45-87ba69e0a57a"> <br/>
 
 The endgame for secure smart contract wallets on Ethereum, <br/> 
-* with quad-layered fail-safe system
-* built assuming compromised private keys from the very start 
-* reducing chances of stolen funds by 99.9%, as compared to EOAs, pure multisigs and other smart contract wallets. <br/>
+* with safe tokens and ownership, __post-compromise__
+* account-abstracted wallets
+* social recovery
+* 4 layers of permissions for your sweet millies and billies
+* fuzzed, invariant tested  <br/>
 
 The last pill that 🐋, 🐳 need for a peaceful sleep.<br/>
 
